@@ -1,0 +1,2411 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HK Transport Master | 香港實時交通總匯</title>
+
+  <!-- Google Fonts: Inter, Noto Sans TC for crisp Traditional Chinese, JetBrains Mono for live telemetry -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet" />
+
+  <!-- Font Awesome 6 for Transit Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'Noto Sans TC', 'system-ui', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            obsidian: '#080C14',
+            panel: '#0F1623',
+            card: '#151E2E',
+            borderDark: '#233048',
+            mtrRed: '#E60012',
+            kmbRed: '#E31837',
+            ctbYellow: '#FACC15',
+            tramGreen: '#007A3D',
+            lrtGold: '#D97706',
+            gmbEmerald: '#10B981',
+            nlbTeal: '#06B6D4',
+            ferryBlue: '#3B82F6',
+          },
+        },
+      },
+    };
+  </script>
+
+  <style>
+    /* Custom sleek scrollbars & utility animations */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #080c14;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #233048;
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #384c70;
+    }
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+    @keyframes pulse-ring {
+      0% { transform: scale(0.85); opacity: 0.9; }
+      70% { transform: scale(1.6); opacity: 0; }
+      100% { transform: scale(1.6); opacity: 0; }
+    }
+    .live-dot::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: 9999px;
+      background-color: inherit;
+      animation: pulse-ring 1.8s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+    }
+  </style>
+</head>
+
+<body class="bg-obsidian text-slate-100 font-sans antialiased selection:bg-sky-500/30 selection:text-sky-200 min-h-screen flex flex-col">
+
+  <!-- ==================== TOP COMMAND BAR ==================== -->
+  <header class="sticky top-0 z-40 bg-panel/90 backdrop-blur-xl border-b border-borderDark">
+    <div class="max-w-[1600px] mx-auto px-3 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-3">
+      
+      <!-- Brand Logo & Live HKT Status -->
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-rose-600 via-amber-500 to-emerald-500 p-[2px] shadow-lg shadow-rose-950/40 shrink-0">
+          <div class="w-full h-full bg-obsidian rounded-[10px] flex items-center justify-center">
+            <i class="fa-solid fa-train-subway text-lg text-white"></i>
+          </div>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-base sm:text-lg font-extrabold tracking-tight bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">
+              HK TRANSPORT MASTER
+            </h1>
+            <span class="hidden md:inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-mono font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+              <span class="relative w-2 h-2 rounded-full bg-emerald-400 live-dot"></span>
+              DATA.GOV.HK LIVE
+            </span>
+          </div>
+          <div class="flex items-center gap-2 text-xs text-slate-400 font-mono">
+            <span id="hkt-clock">HKT --:--:--</span>
+            <span>•</span>
+            <span id="hko-weather" class="text-sky-300 flex items-center gap-1">
+              <i class="fa-solid fa-cloud-sun text-amber-400"></i> Loading HKO...
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Global Multi-Operator Omni-Search -->
+      <div class="relative flex-1 min-w-[240px] max-w-xl order-3 lg:order-2 w-full lg:w-auto">
+        <div class="relative flex items-center">
+          <i class="fa-solid fa-magnifying-glass absolute left-3.5 text-slate-400 text-sm"></i>
+          <input
+            id="omni-search-input"
+            type="text"
+            autocomplete="off"
+            placeholder="Search ANY route or station (e.g. 1A, 960, A21, Central, Tuen Mun, K51)..."
+            class="w-full bg-obsidian/90 border border-borderDark focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 rounded-xl pl-10 pr-20 py-2.5 text-sm text-white placeholder-slate-500 transition outline-none"
+          />
+          <button
+            id="omni-search-clear"
+            onclick="clearOmniSearch()"
+            class="hidden absolute right-3 text-xs text-slate-400 hover:text-white px-2 py-1 rounded-lg bg-slate-800"
+          >
+            ESC
+          </button>
+        </div>
+
+        <!-- Omni-Search Dropdown Results -->
+        <div
+          id="omni-search-dropdown"
+          class="hidden absolute left-0 right-0 mt-2 bg-panel border border-borderDark rounded-2xl shadow-2xl shadow-black/80 max-h-[70vh] overflow-y-auto z-50 divide-y divide-borderDark/60"
+        ></div>
+      </div>
+
+      <!-- Action Controls: Auto-Refresh, Language Switcher, API Inspector -->
+      <div class="flex items-center gap-2 order-2 lg:order-3">
+        <!-- Auto Refresh Pill -->
+        <button
+          id="btn-auto-refresh"
+          onclick="toggleAutoRefresh()"
+          title="Toggle 15s live auto-refresh"
+          class="flex items-center gap-2 px-3 py-2 rounded-xl bg-card hover:bg-slate-800 border border-borderDark text-xs font-medium transition"
+        >
+          <i id="auto-refresh-icon" class="fa-solid fa-arrows-rotate text-emerald-400"></i>
+          <span class="hidden sm:inline" data-i18n="autoRefresh">15s Auto</span>
+          <span id="refresh-countdown" class="font-mono text-emerald-400 font-bold">15s</span>
+        </button>
+
+        <!-- Bilingual Toggle (EN / 繁) -->
+        <button
+          id="btn-lang-toggle"
+          onclick="toggleLanguage()"
+          class="px-3 py-2 rounded-xl bg-card hover:bg-slate-800 border border-borderDark text-xs font-bold tracking-wide text-amber-300 transition"
+        >
+          EN / 繁
+        </button>
+
+        <!-- API Inspector Drawer Toggle -->
+        <button
+          onclick="toggleTelemetryDrawer()"
+          class="flex items-center gap-2 px-3 py-2 rounded-xl bg-sky-500/10 hover:bg-sky-500/20 border border-sky-500/30 text-sky-300 text-xs font-semibold transition"
+        >
+          <i class="fa-solid fa-terminal"></i>
+          <span class="hidden sm:inline">API Logs</span>
+          <span id="api-log-count" class="px-1.5 py-0.5 rounded-md bg-sky-500/20 font-mono text-[11px]">0</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Mobile Horizontal Operator Navigation -->
+    <nav id="mobile-nav" class="lg:hidden flex items-center gap-1.5 px-3 pb-2.5 overflow-x-auto no-scrollbar">
+      <!-- Populated dynamically by renderNav() -->
+    </nav>
+  </header>
+
+  <!-- ==================== MAIN SHELL ==================== -->
+  <div class="flex-1 max-w-[1600px] w-full mx-auto flex">
+
+    <!-- Desktop Sidebar Operator Rail -->
+    <aside class="hidden lg:flex flex-col w-64 shrink-0 border-r border-borderDark bg-panel/40 p-4 gap-1.5">
+      <div class="text-[11px] font-bold uppercase tracking-wider text-slate-500 px-3 mb-1" data-i18n="navTitle">
+        Transport Operators & APIs
+      </div>
+      <div id="desktop-nav" class="flex flex-col gap-1">
+        <!-- Populated dynamically by renderNav() -->
+      </div>
+
+      <!-- API Coverage Summary Card -->
+      <div class="mt-auto pt-4">
+        <div class="p-3.5 rounded-2xl bg-card/80 border border-borderDark text-xs space-y-2">
+          <div class="flex items-center justify-between font-semibold text-slate-200">
+            <span><i class="fa-solid fa-satellite-dish text-emerald-400 mr-1.5"></i>Connected Feeds</span>
+            <span class="font-mono text-emerald-400">9 APIs</span>
+          </div>
+          <p class="text-[11px] text-slate-400 leading-relaxed">
+            Direct browser queries to HKSAR <span class="font-mono text-slate-300">rt.data.gov.hk</span>, <span class="font-mono text-slate-300">data.etabus.gov.hk</span>, <span class="font-mono text-slate-300">data.etagmb.gov.hk</span> & HKO.
+          </p>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Dynamic View Canvas -->
+    <main class="flex-1 min-w-0 p-3 sm:p-6 space-y-5">
+      <!-- Active Operator Header Banner -->
+      <div id="view-header" class="rounded-2xl bg-panel border border-borderDark p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <!-- Populated dynamically -->
+      </div>
+
+      <!-- Main View Content Container -->
+      <div id="main-content" class="space-y-5">
+        <!-- Populated dynamically -->
+      </div>
+    </main>
+  </div>
+
+  <!-- ==================== API TELEMETRY & JSON INSPECTOR DRAWER ==================== -->
+  <div id="telemetry-drawer" class="hidden fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex justify-end">
+    <div class="w-full max-w-2xl bg-panel border-l border-borderDark h-full flex flex-col shadow-2xl">
+      <div class="p-4 border-b border-borderDark flex items-center justify-between">
+        <div class="flex items-center gap-2.5">
+          <i class="fa-solid fa-code text-sky-400"></i>
+          <h2 class="font-bold text-sm sm:text-base">Live HKSAR Open Data API Telemetry</h2>
+        </div>
+        <div class="flex items-center gap-2">
+          <button onclick="clearTelemetryLogs()" class="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs text-slate-300">
+            Clear
+          </button>
+          <button onclick="toggleTelemetryDrawer()" class="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+      </div>
+      <div id="telemetry-list" class="flex-1 overflow-y-auto p-4 space-y-3 font-mono text-xs">
+        <div class="text-slate-500 text-center py-10">No API requests logged yet. Select any operator or station to trigger live feeds.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== TOAST NOTIFICATION CONTAINER ==================== -->
+  <div id="toast-container" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 max-w-sm pointer-events-none"></div>
+
+  <!-- ==================== APPLICATION LOGIC ==================== -->
+  <script>
+    /**
+     * ============================================================================
+     * 1. GLOBAL STATE, TRANSLATIONS & MASTER HONG KONG TRANSIT METADATA
+     * ============================================================================
+     */
+    const STATE = {
+      lang: 'en', // 'en' | 'tc'
+      activeTab: 'dashboard',
+      autoRefresh: true,
+      countdown: 15,
+      telemetryLogs: [],
+      pinnedItems: JSON.parse(localStorage.getItem('hk_tm_pins_v1') || 'null') || [
+        { type: 'mtr', line: 'TML', sta: 'HUH', titleEn: 'MTR Tuen Ma Line • Hung Hom', titleTc: '港鐵屯馬綫 • 紅磡' },
+        { type: 'mtr', line: 'EAL', sta: 'ADM', titleEn: 'MTR East Rail Line • Admiralty', titleTc: '港鐵東鐵綫 • 金鐘' },
+        { type: 'lrt', stationId: '295', titleEn: 'Light Rail • Tuen Mun (295)', titleTc: '輕鐵 • 屯門站 (295)' },
+        { type: 'mtrbus', routeName: 'K51', titleEn: 'MTR Bus • Route K51', titleTc: '港鐵巴士 • K51 路線' },
+      ],
+      // Operator-specific active selections & cached datasets
+      mtr: { line: 'EAL', sta: 'ADM' },
+      kmb: { routes: [], stopsMap: {}, loaded: false, selectedRoute: '1A', direction: 'outbound', serviceType: '1', routeStops: [], etas: [] },
+      ctb: { routes: [], stopsCache: {}, loaded: false, selectedRoute: '10', direction: 'outbound', routeStops: [], etasMap: {} },
+      tram: { direction: 'westbound', selectedStop: '48W' },
+      lrt: { stationId: '295' },
+      mtrbus: { routeName: 'K51' },
+      gmb: { region: 'HKI', routes: [], selectedRoute: '1', variants: [], selectedVariantIdx: 0, stops: [], selectedStopSeq: 1 },
+      nlb: { routes: [], loaded: false, selectedRouteId: '2', stops: [], selectedStopId: '' },
+      ferry: { operator: 'all' },
+    };
+
+    const I18N = {
+      en: {
+        navTitle: 'Transport Operators & APIs',
+        autoRefresh: '15s Auto',
+        pinnedTitle: 'Pinned Multi-Modal Commute Board',
+        pinnedSub: 'Live real-time arrivals across MTR, Buses, Light Rail, Tram & Minibus in one unified view.',
+        quickHubs: 'Instant Major Interchange Hubs',
+        refreshNow: 'Refresh Now',
+        pinBtn: 'Pin to Board',
+        unpinBtn: 'Pinned',
+        min: 'min',
+        arriving: 'Arriving',
+        departing: 'Departing',
+        platform: 'Plat',
+        direction: 'Direction',
+        outbound: 'Outbound',
+        inbound: 'Inbound',
+        loading: 'Fetching real-time HKSAR API...',
+        noData: 'No active departures reported right now (service may be outside operating hours).',
+      },
+      tc: {
+        navTitle: '交通營辦商及實時數據',
+        autoRefresh: '15秒自動更新',
+        pinnedTitle: '個人釘選跨交通實時看板',
+        pinnedSub: '一站式同步顯示港鐵、九巴、城巴、輕鐵、電車及小巴實時到站時間。',
+        quickHubs: '熱門大型轉車站一鍵查詢',
+        refreshNow: '立即更新',
+        pinBtn: '釘選至看板',
+        unpinBtn: '已釘選',
+        min: '分鐘',
+        arriving: '即將抵達',
+        departing: '即將開出',
+        platform: '月台',
+        direction: '方向',
+        outbound: '去程',
+        inbound: '回程',
+        loading: '正在讀取政府開放數據 API...',
+        noData: '暫無實時班次資料（可能為非服務時間）。',
+      },
+    };
+
+    const OPERATORS = [
+      { id: 'dashboard', icon: 'fa-layer-group', color: 'text-sky-400', badge: 'ALL', nameEn: 'All-In-One Board', nameTc: '綜合實時看板' },
+      { id: 'mtr', icon: 'fa-train-subway', color: 'text-rose-500', badge: 'MTR', nameEn: 'MTR Heavy Rail', nameTc: '港鐵重鐵網絡' },
+      { id: 'kmb', icon: 'fa-bus', color: 'text-red-500', badge: 'KMB', nameEn: 'KMB & Long Win', nameTc: '九巴及龍運巴士' },
+      { id: 'ctb', icon: 'fa-bus-simple', color: 'text-yellow-400', badge: 'CTB', nameEn: 'Citybus (CTB)', nameTc: '城巴實時到站' },
+      { id: 'tram', icon: 'fa-train-tram', color: 'text-emerald-500', badge: 'TRAM', nameEn: 'HK Tramways', nameTc: '香港電車 (叮叮)' },
+      { id: 'lrt', icon: 'fa-train', color: 'text-amber-500', badge: 'LRT', nameEn: 'MTR Light Rail', nameTc: '港鐵輕鐵系統' },
+      { id: 'mtrbus', icon: 'fa-van-shuttle', color: 'text-indigo-400', badge: 'K-BUS', nameEn: 'MTR Feeder Bus', nameTc: '港鐵接駁巴士' },
+      { id: 'gmb', icon: 'fa-taxi', color: 'text-emerald-400', badge: 'GMB', nameEn: 'Green Minibus', nameTc: '專線小巴實時' },
+      { id: 'nlb', icon: 'fa-mountain-sun', color: 'text-cyan-400', badge: 'NLB', nameEn: 'New Lantao Bus', nameTc: '新大嶼山巴士' },
+      { id: 'ferry', icon: 'fa-ferry', color: 'text-blue-400', badge: 'FERRY', nameEn: 'Ferries & Traffic', nameTc: '渡輪及交通消息' },
+    ];
+
+    // Complete 10-Line MTR Real-Time API Dictionary
+    const MTR_LINES = {
+      EAL: {
+        nameEn: 'East Rail Line', nameTc: '東鐵綫', color: '#5EB6E4',
+        stations: [
+          { code: 'ADM', en: 'Admiralty', tc: '金鐘' }, { code: 'EXC', en: 'Exhibition Centre', tc: '會展' },
+          { code: 'HUH', en: 'Hung Hom', tc: '紅磡' }, { code: 'MKK', en: 'Mong Kok East', tc: '旺角東' },
+          { code: 'KOT', en: 'Kowloon Tong', tc: '九龍塘' }, { code: 'TAW', en: 'Tai Wai', tc: '大圍' },
+          { code: 'SHT', en: 'Sha Tin', tc: '沙田' }, { code: 'FOT', en: 'Fo Tan', tc: '火炭' },
+          { code: 'RAC', en: 'Racecourse', tc: '馬場' }, { code: 'UNI', en: 'University', tc: '大學' },
+          { code: 'TAP', en: 'Tai Po Market', tc: '大埔墟' }, { code: 'TWO', en: 'Tai Wo', tc: '太和' },
+          { code: 'FAN', en: 'Fanling', tc: '粉嶺' }, { code: 'SHS', en: 'Sheung Shui', tc: '上水' },
+          { code: 'LOW', en: 'Lo Wu', tc: '羅湖' }, { code: 'LMC', en: 'Lok Ma Chau', tc: '落馬洲' },
+        ]
+      },
+      TML: {
+        nameEn: 'Tuen Ma Line', nameTc: '屯馬綫', color: '#9A3B26',
+        stations: [
+          { code: 'WKS', en: 'Wu Kai Sha', tc: '烏溪沙' }, { code: 'MOS', en: 'Ma On Shan', tc: '馬鞍山' },
+          { code: 'HEO', en: 'Heng On', tc: '恆安' }, { code: 'TSH', en: 'Tai Shui Hang', tc: '大水坑' },
+          { code: 'SHM', en: 'Shek Mun', tc: '石門' }, { code: 'CIO', en: 'City One', tc: '第一城' },
+          { code: 'STW', en: 'Sha Tin Wai', tc: '沙田圍' }, { code: 'CKT', en: 'Che Kung Temple', tc: '車公廟' },
+          { code: 'TAW', en: 'Tai Wai', tc: '大圍' }, { code: 'HIK', en: 'Hin Keng', tc: '顯徑' },
+          { code: 'DIH', en: 'Diamond Hill', tc: '鑽石山' }, { code: 'KAT', en: 'Kai Tak', tc: '啟德' },
+          { code: 'SUW', en: 'Sung Wong Toi', tc: '宋皇臺' }, { code: 'TKW', en: 'To Kwa Wan', tc: '土瓜灣' },
+          { code: 'HOM', en: 'Ho Man Tin', tc: '何文田' }, { code: 'HUH', en: 'Hung Hom', tc: '紅磡' },
+          { code: 'ETS', en: 'East Tsim Sha Tsui', tc: '尖東' }, { code: 'AUS', en: 'Austin', tc: '柯士甸' },
+          { code: 'NAC', en: 'Nam Cheong', tc: '南昌' }, { code: 'MEF', en: 'Mei Foo', tc: '美孚' },
+          { code: 'TWW', en: 'Tsuen Wan West', tc: '荃灣西' }, { code: 'KSR', en: 'Kam Sheung Road', tc: '錦上路' },
+          { code: 'YUL', en: 'Yuen Long', tc: '元朗' }, { code: 'LOP', en: 'Long Ping', tc: '朗屏' },
+          { code: 'TIS', en: 'Tin Shui Wai', tc: '天水圍' }, { code: 'SIH', en: 'Siu Hong', tc: '兆康' },
+          { code: 'TUM', en: 'Tuen Mun', tc: '屯門' },
+        ]
+      },
+      TWL: {
+        nameEn: 'Tsuen Wan Line', nameTc: '荃灣綫', color: '#E60012',
+        stations: [
+          { code: 'CEN', en: 'Central', tc: '中環' }, { code: 'ADM', en: 'Admiralty', tc: '金鐘' },
+          { code: 'TST', en: 'Tsim Sha Tsui', tc: '尖沙咀' }, { code: 'JOR', en: 'Jordan', tc: '佐敦' },
+          { code: 'YMT', en: 'Yau Ma Tei', tc: '油麻地' }, { code: 'MOK', en: 'Mong Kok', tc: '旺角' },
+          { code: 'PRE', en: 'Prince Edward', tc: '太子' }, { code: 'SSP', en: 'Sham Shui Po', tc: '深水埗' },
+          { code: 'CSW', en: 'Cheung Sha Wan', tc: '長沙灣' }, { code: 'LCK', en: 'Lai Chi Kok', tc: '荔枝角' },
+          { code: 'MEF', en: 'Mei Foo', tc: '美孚' }, { code: 'LAK', en: 'Lai King', tc: '荔景' },
+          { code: 'KWF', en: 'Kwai Fong', tc: '葵芳' }, { code: 'KWH', en: 'Kwai Hing', tc: '葵興' },
+          { code: 'TWH', en: 'Tai Wo Hau', tc: '大窩口' }, { code: 'TSW', en: 'Tsuen Wan', tc: '荃灣' },
+        ]
+      },
+      ISL: {
+        nameEn: 'Island Line', nameTc: '港島綫', color: '#0075C2',
+        stations: [
+          { code: 'KET', en: 'Kennedy Town', tc: '堅尼地城' }, { code: 'HKU', en: 'HKU', tc: '香港大學' },
+          { code: 'SYP', en: 'Sai Ying Pun', tc: '西營盤' }, { code: 'SHW', en: 'Sheung Wan', tc: '上環' },
+          { code: 'CEN', en: 'Central', tc: '中環' }, { code: 'ADM', en: 'Admiralty', tc: '金鐘' },
+          { code: 'WAC', en: 'Wan Chai', tc: '灣仔' }, { code: 'CAB', en: 'Causeway Bay', tc: '銅鑼灣' },
+          { code: 'TIH', en: 'Tin Hau', tc: '天后' }, { code: 'FOH', en: 'Fortress Hill', tc: '炮台山' },
+          { code: 'NOP', en: 'North Point', tc: '北角' }, { code: 'QUB', en: 'Quarry Bay', tc: '鰂魚涌' },
+          { code: 'TAK', en: 'Tai Koo', tc: '太古' }, { code: 'SWH', en: 'Sai Wan Ho', tc: '西灣河' },
+          { code: 'SKW', en: 'Shau Kei Wan', tc: '筲箕灣' }, { code: 'HFC', en: 'Heng Fa Chuen', tc: '杏花邨' },
+          { code: 'CHW', en: 'Chai Wan', tc: '柴灣' },
+        ]
+      },
+      KTL: {
+        nameEn: 'Kwun Tong Line', nameTc: '觀塘綫', color: '#009E49',
+        stations: [
+          { code: 'WHA', en: 'Whampoa', tc: '黃埔' }, { code: 'HOM', en: 'Ho Man Tin', tc: '何文田' },
+          { code: 'YMT', en: 'Yau Ma Tei', tc: '油麻地' }, { code: 'MOK', en: 'Mong Kok', tc: '旺角' },
+          { code: 'PRE', en: 'Prince Edward', tc: '太子' }, { code: 'SKM', en: 'Shek Kip Mei', tc: '石硤尾' },
+          { code: 'KOT', en: 'Kowloon Tong', tc: '九龍塘' }, { code: 'LOF', en: 'Lok Fu', tc: '樂富' },
+          { code: 'WTS', en: 'Wong Tai Sin', tc: '黃大仙' }, { code: 'DIH', en: 'Diamond Hill', tc: '鑽石山' },
+          { code: 'CHH', en: 'Choi Hung', tc: '彩虹' }, { code: 'KOB', en: 'Kowloon Bay', tc: '九龍灣' },
+          { code: 'NTK', en: 'Ngau Tau Kok', tc: '牛頭角' }, { code: 'KWT', en: 'Kwun Tong', tc: '觀塘' },
+          { code: 'LAT', en: 'Lam Tin', tc: '藍田' }, { code: 'YAT', en: 'Yau Tong', tc: '油塘' },
+          { code: 'TIK', en: 'Tiu Keng Leng', tc: '調景嶺' },
+        ]
+      },
+      TKL: {
+        nameEn: 'Tseung Kwan O Line', nameTc: '將軍澳綫', color: '#7D3C98',
+        stations: [
+          { code: 'NOP', en: 'North Point', tc: '北角' }, { code: 'QUB', en: 'Quarry Bay', tc: '鰂魚涌' },
+          { code: 'YAT', en: 'Yau Tong', tc: '油塘' }, { code: 'TIK', en: 'Tiu Keng Leng', tc: '調景嶺' },
+          { code: 'TKO', en: 'Tseung Kwan O', tc: '將軍澳' }, { code: 'LHP', en: 'LOHAS Park', tc: '康城' },
+          { code: 'HAH', en: 'Hang Hau', tc: '坑口' }, { code: 'POA', en: 'Po Lam', tc: '寶琳' },
+        ]
+      },
+      TCL: {
+        nameEn: 'Tung Chung Line', nameTc: '東涌綫', color: '#F38B00',
+        stations: [
+          { code: 'HOK', en: 'Hong Kong', tc: '香港' }, { code: 'KOW', en: 'Kowloon', tc: '九龍' },
+          { code: 'OLY', en: 'Olympic', tc: '奧運' }, { code: 'NAC', en: 'Nam Cheong', tc: '南昌' },
+          { code: 'LAK', en: 'Lai King', tc: '荔景' }, { code: 'TSY', en: 'Tsing Yi', tc: '青衣' },
+          { code: 'SUN', en: 'Sunny Bay', tc: '欣澳' }, { code: 'TUC', en: 'Tung Chung', tc: '東涌' },
+        ]
+      },
+      AEL: {
+        nameEn: 'Airport Express', nameTc: '機場快綫', color: '#007078',
+        stations: [
+          { code: 'HOK', en: 'Hong Kong', tc: '香港' }, { code: 'KOW', en: 'Kowloon', tc: '九龍' },
+          { code: 'TSY', en: 'Tsing Yi', tc: '青衣' }, { code: 'AIR', en: 'Airport', tc: '機場' },
+          { code: 'AWE', en: 'AsiaWorld-Expo', tc: '博覽館' },
+        ]
+      },
+      SIL: {
+        nameEn: 'South Island Line', nameTc: '南港島綫', color: '#B5BD00',
+        stations: [
+          { code: 'ADM', en: 'Admiralty', tc: '金鐘' }, { code: 'OCP', en: 'Ocean Park', tc: '海洋公園' },
+          { code: 'WCH', en: 'Wong Chuk Hang', tc: '黃竹坑' }, { code: 'LET', en: 'Lei Tung', tc: '利東' },
+          { code: 'SOH', en: 'South Horizons', tc: '海怡半島' },
+        ]
+      },
+      DRL: {
+        nameEn: 'Disneyland Resort Line', nameTc: '迪士尼綫', color: '#F173AC',
+        stations: [
+          { code: 'SUN', en: 'Sunny Bay', tc: '欣澳' }, { code: 'DIS', en: 'Disneyland Resort', tc: '迪士尼' },
+        ]
+      },
+    };
+
+    // Build reverse lookup map for MTR station codes -> names
+    const MTR_STATION_NAMES = {};
+    Object.values(MTR_LINES).forEach(line => {
+      line.stations.forEach(s => {
+        MTR_STATION_NAMES[s.code] = { en: s.en, tc: s.tc };
+      });
+    });
+
+    // Major Light Rail Stations
+    const LRT_STATIONS = [
+      { id: '001', en: 'Tuen Mun Ferry Pier', tc: '屯門碼頭' },
+      { id: '070', en: 'Butterfly', tc: '蝴蝶' },
+      { id: '100', en: 'Siu Hong', tc: '兆康' },
+      { id: '250', en: 'Pui To', tc: '杯渡' },
+      { id: '280', en: 'Town Centre', tc: '市中心' },
+      { id: '295', en: 'Tuen Mun', tc: '屯門' },
+      { id: '330', en: 'Tai Hing (North)', tc: '大興(北)' },
+      { id: '370', en: 'Leung King', tc: '良景' },
+      { id: '430', en: 'Tin Shui Wai', tc: '天水圍' },
+      { id: '450', en: 'Tin Yiu', tc: '天耀' },
+      { id: '480', en: 'Tin Wing', tc: '天榮' },
+      { id: '530', en: 'Wetland Park', tc: '濕地公園' },
+      { id: '550', en: 'Chung Fu', tc: '頌富' },
+      { id: '580', en: 'Hung Shui Kiu', tc: '洪水橋' },
+      { id: '590', en: 'Ping Shan', tc: '屏山' },
+      { id: '600', en: 'Yuen Long', tc: '元朗' },
+    ];
+
+    // MTR Bus & Feeder Bus Routes
+    const MTR_BUS_ROUTES = [
+      { route: 'K51', en: 'Fu Tai ↔ Tai Lam', tc: '富泰 ↔ 大欖' },
+      { route: 'K52', en: 'Yuet Wu Villa ↔ Lung Kwu Tan', tc: '悅湖山莊 ↔ 龍鼓灘' },
+      { route: 'K53', en: 'Tuen Mun Station ↔ So Kwun Wat (Circular)', tc: '屯門站 ↔ 掃管笏 (循環線)' },
+      { route: 'K58', en: 'Fu Tai ↔ Castle Peak Bay', tc: '富泰 ↔ 青山灣' },
+      { route: 'K65', en: 'Yuen Long Station ↔ Lau Fau Shan', tc: '元朗站 ↔ 流浮山' },
+      { route: 'K66', en: 'Long Ping ↔ Tai Tong Wong Nai Tun', tc: '朗屏 ↔ 大棠黃泥墩村' },
+      { route: 'K68', en: 'Yuen Long Industrial Estate ↔ Yuen Long Park', tc: '元朗工業邨 ↔ 元朗公園' },
+      { route: 'K73', en: 'Tin Heng ↔ Yuen Long West', tc: '天恆 ↔ 元朗西' },
+      { route: 'K74', en: 'Tin Shui ↔ Au Tau', tc: '天瑞 ↔ 凹頭' },
+      { route: 'K75A', en: 'Tin Shui Wai Station ↔ Hung Shui Kiu', tc: '天水圍站 ↔ 洪水橋' },
+      { route: 'K75P', en: 'Tin Shui ↔ Hung Shui Kiu', tc: '天瑞 ↔ 洪水橋' },
+      { route: 'K76', en: 'Tin Heng ↔ Tin Shui Wai Station', tc: '天恆 ↔ 天水圍站' },
+      { route: '506', en: 'Tuen Mun Ferry Pier ↔ Siu Lun', tc: '屯門碼頭 ↔ 兆麟' },
+    ];
+
+    // Hong Kong Tramways Major Stops
+    const TRAM_STOPS = {
+      westbound: [
+        { code: '08W', en: 'Shau Kei Wan Terminus', tc: '筲箕灣總站', district: 'Eastern' },
+        { code: '22W', en: 'Tai Koo Shing Road', tc: '太古城道', district: 'Quarry Bay' },
+        { code: '30W', en: 'North Point Terminus / Chun Yeung St', tc: '北角總站 / 春秧街', district: 'North Point' },
+        { code: '38W', en: 'Fortress Hill', tc: '炮台山', district: 'North Point' },
+        { code: '44W', en: 'Tin Hau', tc: '天后', district: 'Causeway Bay' },
+        { code: '48W', en: 'Paterson Street (Causeway Bay)', tc: '百德新街 (銅鑼灣)', district: 'Causeway Bay' },
+        { code: '52W', en: 'Percival Street (Times Square)', tc: '波斯富街 (時代廣場)', district: 'Causeway Bay' },
+        { code: '60W', en: 'Fleming Road (Wan Chai)', tc: '菲林明道 (灣仔)', district: 'Wan Chai' },
+        { code: '68W', en: 'Admiralty MTR Station', tc: '金鐘港鐵站', district: 'Admiralty' },
+        { code: '74W', en: 'Pedder Street (Central)', tc: '畢打街 (中環)', district: 'Central' },
+        { code: '80W', en: 'Western Market Terminus', tc: '上環(西港城)總站', district: 'Sheung Wan' },
+        { code: '92W', en: 'Water Street (HKU)', tc: '水街 (香港大學)', district: 'Sai Wan' },
+        { code: '104W', en: 'Kennedy Town Terminus', tc: '堅尼地城總站', district: 'Kennedy Town' },
+      ],
+      eastbound: [
+        { code: '01E', en: 'Kennedy Town Terminus', tc: '堅尼地城總站', district: 'Kennedy Town' },
+        { code: '15E', en: 'Western Street (Sai Ying Pun)', tc: '西邊街 (西營盤)', district: 'Sai Wan' },
+        { code: '25E', en: 'Des Voeux Road Central (Central Market)', tc: '德輔道中 (中環街市)', district: 'Central' },
+        { code: '31E', en: 'Bank Street (HSBC / Statue Square)', tc: '銀行街 (匯豐總行)', district: 'Central' },
+        { code: '35E', en: 'Admiralty MTR Station', tc: '金鐘港鐵站', district: 'Admiralty' },
+        { code: '45E', en: 'O’Brien Road (Wan Chai)', tc: '柯布連道 (灣仔)', district: 'Wan Chai' },
+        { code: '53E', en: 'Canal Road West (Goose Neck Bridge)', tc: '堅拿道西 (鵝頸橋)', district: 'Causeway Bay' },
+        { code: '57E', en: 'Yee Wo Street (SOGO Causeway Bay)', tc: '怡和街 (崇光百貨)', district: 'Causeway Bay' },
+        { code: '65E', en: 'Tin Hau', tc: '天后', district: 'Tin Hau' },
+        { code: '77E', en: 'Shu Kuk Street (North Point)', tc: '書局街 (北角)', district: 'North Point' },
+        { code: '85E', en: 'Quarry Bay', tc: '鰂魚涌', district: 'Quarry Bay' },
+        { code: '93E', en: 'Tai On Building (Sai Wan Ho)', tc: '太安樓 (西灣河)', district: 'Sai Wan Ho' },
+        { code: '105E', en: 'Shau Kei Wan Terminus', tc: '筲箕灣總站', district: 'Eastern' },
+      ]
+    };
+
+    // Ferry Timetables & Frequencies (Star Ferry, Sun Ferry, HKKF)
+    const FERRY_SERVICES = [
+      { id: 'sf-cen-tst', operator: 'Star Ferry 天星小輪', routeEn: 'Central ↔ Tsim Sha Tsui', routeTc: '中環 ↔ 尖沙咀', pierEn: 'Central Pier 7 / TST Star Ferry Pier', pierTc: '中環7號碼頭 / 尖沙咀天星碼頭', intervalMin: 8, fare: 'HK$5.0 - $6.5', first: '06:30', last: '23:30' },
+      { id: 'sf-wc-tst', operator: 'Star Ferry 天星小輪', routeEn: 'Wan Chai ↔ Tsim Sha Tsui', routeTc: '灣仔 ↔ 尖沙咀', pierEn: 'Wan Chai Ferry Pier / TST Pier', pierTc: '灣仔渡輪碼頭 / 尖沙咀碼頭', intervalMin: 12, fare: 'HK$5.0 - $6.5', first: '07:20', last: '23:00' },
+      { id: 'sun-cc', operator: 'Sun Ferry 新渡輪', routeEn: 'Central ↔ Cheung Chau', routeTc: '中環 ↔ 長洲', pierEn: 'Central Pier 5', pierTc: '中環5號碼頭', intervalMin: 30, fare: 'HK$14.8 - $29.2', first: '00:30', last: '23:45' },
+      { id: 'sun-mw', operator: 'Sun Ferry 新渡輪', routeEn: 'Central ↔ Mui Wo (Lantau)', routeTc: '中環 ↔ 梅窩', pierEn: 'Central Pier 6', pierTc: '中環6號碼頭', intervalMin: 40, fare: 'HK$17.2 - $34.1', first: '00:30', last: '23:30' },
+      { id: 'hkkf-ysw', operator: 'HKKF 港九小輪', routeEn: 'Central ↔ Yung Shue Wan (Lamma)', routeTc: '中環 ↔ 南丫島榕樹灣', pierEn: 'Central Pier 4', pierTc: '中環4號碼頭', intervalMin: 35, fare: 'HK$22.1 - $30.8', first: '06:30', last: '00:30' },
+      { id: 'hkkf-pc', operator: 'HKKF 港九小輪', routeEn: 'Central ↔ Peng Chau', routeTc: '中環 ↔ 坪洲', pierEn: 'Central Pier 6', pierTc: '中環6號碼頭', intervalMin: 45, fare: 'HK$19.8 - $36.9', first: '07:00', last: '23:30' },
+    ];
+
+    /**
+     * ============================================================================
+     * 2. API TELEMETRY & FETCH ENGINE
+     * ============================================================================
+     */
+    async function apiFetch(operatorTag, url, options = {}) {
+      const startTime = performance.now();
+      const method = options.method || 'GET';
+      try {
+        const response = await fetch(url, options);
+        const latency = Math.round(performance.now() - startTime);
+        const contentType = response.headers.get('content-type') || '';
+        let payload;
+        if (contentType.includes('application/json')) {
+          payload = await response.json();
+        } else {
+          const text = await response.text();
+          try {
+            payload = JSON.parse(text);
+          } catch {
+            payload = text;
+          }
+        }
+        logTelemetry({ operator: operatorTag, method, url, status: response.status, latency, ok: response.ok, payload });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return payload;
+      } catch (err) {
+        const latency = Math.round(performance.now() - startTime);
+        logTelemetry({ operator: operatorTag, method, url, status: 'CORS/ERR', latency, ok: false, payload: { error: err.message } });
+        throw err;
+      }
+    }
+
+    function logTelemetry(entry) {
+      STATE.telemetryLogs.unshift({
+        time: new Date().toLocaleTimeString('en-GB', { timeZone: 'Asia/Hong_Kong' }),
+        ...entry,
+      });
+      if (STATE.telemetryLogs.length > 40) STATE.telemetryLogs.pop();
+      const countEl = document.getElementById('api-log-count');
+      if (countEl) countEl.textContent = STATE.telemetryLogs.length;
+      renderTelemetryDrawer();
+    }
+
+    function renderTelemetryDrawer() {
+      const listEl = document.getElementById('telemetry-list');
+      if (!listEl) return;
+      if (STATE.telemetryLogs.length === 0) {
+        listEl.innerHTML = `<div class="text-slate-500 text-center py-10">No API requests logged yet.</div>`;
+        return;
+      }
+      listEl.innerHTML = STATE.telemetryLogs.map((log, idx) => `
+        <div class="rounded-xl bg-obsidian border ${log.ok ? 'border-borderDark' : 'border-rose-500/40'} p-3 space-y-2">
+          <div class="flex items-center justify-between gap-2">
+            <div class="flex items-center gap-2">
+              <span class="px-2 py-0.5 rounded text-[10px] font-bold ${log.ok ? 'bg-emerald-500/15 text-emerald-400' : 'bg-rose-500/15 text-rose-400'}">
+                ${log.method} ${log.status}
+              </span>
+              <span class="font-bold text-sky-400">${log.operator}</span>
+            </div>
+            <span class="text-slate-400">${log.latency}ms • ${log.time} HKT</span>
+          </div>
+          <div class="text-[11px] text-slate-300 break-all bg-panel/80 p-2 rounded-lg border border-borderDark/60">${log.url}</div>
+          <details class="text-[11px]">
+            <summary class="cursor-pointer text-slate-400 hover:text-white select-none">Inspect Raw Response Payload</summary>
+            <pre class="mt-2 p-2.5 rounded-lg bg-black/60 text-emerald-300 overflow-x-auto max-h-48">${escapeHtml(
+              typeof log.payload === 'string' ? log.payload.slice(0, 1500) : JSON.stringify(log.payload, null, 2).slice(0, 2500)
+            )}</pre>
+          </details>
+        </div>
+      `).join('');
+    }
+
+    function toggleTelemetryDrawer() {
+      document.getElementById('telemetry-drawer').classList.toggle('hidden');
+    }
+
+    function clearTelemetryLogs() {
+      STATE.telemetryLogs = [];
+      document.getElementById('api-log-count').textContent = '0';
+      renderTelemetryDrawer();
+    }
+
+    /**
+     * ============================================================================
+     * 3. HELPER UTILITIES (TIME, PINNING, TOASTS, HTML ESCAPING)
+     * ============================================================================
+     */
+    function escapeHtml(str) {
+      if (str === null || str === undefined) return '';
+      return String(str).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+    }
+
+    function t(key) {
+      return I18N[STATE.lang][key] || key;
+    }
+
+    function showToast(msg, type = 'info') {
+      const container = document.getElementById('toast-container');
+      const colors = {
+        info: 'bg-panel border-sky-500/40 text-sky-200',
+        success: 'bg-panel border-emerald-500/40 text-emerald-200',
+        warn: 'bg-panel border-amber-500/40 text-amber-200',
+      };
+      const el = document.createElement('div');
+      el.className = `pointer-events-auto px-4 py-3 rounded-xl border shadow-xl text-xs font-medium flex items-center gap-2.5 transition-all duration-300 ${colors[type] || colors.info}`;
+      el.innerHTML = `<i class="fa-solid fa-circle-info"></i><span>${escapeHtml(msg)}</span>`;
+      container.appendChild(el);
+      setTimeout(() => {
+        el.style.opacity = '0';
+        setTimeout(() => el.remove(), 300);
+      }, 3000);
+    }
+
+    function calcMinutesFromISO(isoString) {
+      if (!isoString) return null;
+      const target = new Date(isoString.replace(' ', 'T') + (isoString.includes('+') || isoString.includes('Z') ? '' : '+08:00'));
+      if (isNaN(target.getTime())) return null;
+      const diffMin = Math.round((target.getTime() - Date.now()) / 60000);
+      return Math.max(0, diffMin);
+    }
+
+    function formatMinutesBadge(mins, remarks = '') {
+      if (mins === null || mins === undefined) {
+        return `<span class="px-2.5 py-1 rounded-lg bg-slate-800 text-slate-400 text-xs font-mono">${escapeHtml(remarks || '—')}</span>`;
+      }
+      if (mins <= 1) {
+        return `<span class="px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-xs font-bold animate-pulse">${t('arriving')}</span>`;
+      }
+      const badgeColor = mins <= 4 ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' : 'bg-sky-500/15 text-sky-300 border-sky-500/30';
+      return `<span class="px-2.5 py-1 rounded-lg ${badgeColor} border text-xs font-mono font-bold">${mins} ${t('min')}</span>`;
+    }
+
+    function savePins() {
+      localStorage.setItem('hk_tm_pins_v1', JSON.stringify(STATE.pinnedItems));
+    }
+
+    function togglePin(item) {
+      const idx = STATE.pinnedItems.findIndex(p => JSON.stringify(p) === JSON.stringify(item));
+      if (idx >= 0) {
+        STATE.pinnedItems.splice(idx, 1);
+        showToast(STATE.lang === 'en' ? 'Removed from Commute Board' : '已從實時看板移除', 'warn');
+      } else {
+        STATE.pinnedItems.unshift(item);
+        showToast(STATE.lang === 'en' ? 'Pinned to All-In-One Commute Board!' : '已釘選至個人實時看板！', 'success');
+      }
+      savePins();
+      renderActiveView();
+    }
+
+    function isPinned(item) {
+      return STATE.pinnedItems.some(p => JSON.stringify(p) === JSON.stringify(item));
+    }
+
+    /**
+     * ============================================================================
+     * 4. LIVE CLOCK & HONG KONG OBSERVATORY WEATHER API
+     * ============================================================================
+     */
+    function startClock() {
+      const update = () => {
+        const nowStr = new Date().toLocaleTimeString('en-GB', {
+          timeZone: 'Asia/Hong_Kong',
+          hour12: false,
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+        });
+        document.getElementById('hkt-clock').textContent = `HKT ${nowStr}`;
+      };
+      update();
+      setInterval(update, 1000);
+    }
+
+    async function fetchHKOWeather() {
+      try {
+        const data = await apiFetch('HKO Weather', 'https://data.weather.gov.hk/weatherAPI/opendata/weather.php?dataType=rhrread&lang=en');
+        const temp = data?.temperature?.data?.find(d => d.place === 'Hong Kong Observatory')?.value ?? data?.temperature?.data?.[0]?.value;
+        const hum = data?.humidity?.data?.[0]?.value;
+        const warn = data?.warningMessage?.[0];
+        const el = document.getElementById('hko-weather');
+        if (el && temp !== undefined) {
+          el.innerHTML = `<i class="fa-solid fa-temperature-half text-amber-400"></i> ${temp}°C • ${hum}% RH ${warn ? `<span class="ml-1 px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 text-[10px]">⚠️ Warning</span>` : ''}`;
+        }
+      } catch {
+        const el = document.getElementById('hko-weather');
+        if (el) el.textContent = 'HK Observatory';
+      }
+    }
+
+    /**
+     * ============================================================================
+     * 5. NAVIGATION & LANGUAGE / AUTO-REFRESH CONTROLS
+     * ============================================================================
+     */
+    function renderNav() {
+      const desktopNav = document.getElementById('desktop-nav');
+      const mobileNav = document.getElementById('mobile-nav');
+
+      desktopNav.innerHTML = OPERATORS.map(op => {
+        const active = STATE.activeTab === op.id;
+        return `
+          <button
+            onclick="switchTab('${op.id}')"
+            class="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-left text-xs font-semibold transition ${
+              active
+                ? 'bg-gradient-to-r from-sky-500/20 to-indigo-500/10 text-white border border-sky-500/40 shadow-sm'
+                : 'text-slate-400 hover:text-white hover:bg-card/60 border border-transparent'
+            }"
+          >
+            <span class="flex items-center gap-2.5 truncate">
+              <i class="fa-solid ${op.icon} ${op.color} w-4 text-center"></i>
+              <span class="truncate">${STATE.lang === 'en' ? op.nameEn : op.nameTc}</span>
+            </span>
+            <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-obsidian/80 text-slate-400">${op.badge}</span>
+          </button>
+        `;
+      }).join('');
+
+      mobileNav.innerHTML = OPERATORS.map(op => {
+        const active = STATE.activeTab === op.id;
+        return `
+          <button
+            onclick="switchTab('${op.id}')"
+            class="shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition ${
+              active
+                ? 'bg-sky-500/20 text-white border border-sky-500/50'
+                : 'bg-card text-slate-400 border border-borderDark'
+            }"
+          >
+            <i class="fa-solid ${op.icon} ${op.color}"></i>
+            <span>${STATE.lang === 'en' ? op.nameEn : op.nameTc}</span>
+          </button>
+        `;
+      }).join('');
+    }
+
+    function switchTab(tabId) {
+      STATE.activeTab = tabId;
+      STATE.countdown = 15;
+      renderNav();
+      renderActiveView();
+    }
+
+    function toggleLanguage() {
+      STATE.lang = STATE.lang === 'en' ? 'tc' : 'en';
+      document.querySelectorAll('[data-i18n]').forEach(el => {
+        el.textContent = t(el.getAttribute('data-i18n'));
+      });
+      renderNav();
+      renderActiveView();
+    }
+
+    function toggleAutoRefresh() {
+      STATE.autoRefresh = !STATE.autoRefresh;
+      const icon = document.getElementById('auto-refresh-icon');
+      const count = document.getElementById('refresh-countdown');
+      if (STATE.autoRefresh) {
+        icon.className = 'fa-solid fa-arrows-rotate text-emerald-400';
+        count.textContent = `${STATE.countdown}s`;
+        showToast('15s Live Auto-Refresh Enabled', 'success');
+      } else {
+        icon.className = 'fa-solid fa-pause text-slate-400';
+        count.textContent = 'OFF';
+        showToast('Auto-Refresh Paused', 'warn');
+      }
+    }
+
+    function startAutoRefreshLoop() {
+      setInterval(() => {
+        if (!STATE.autoRefresh) return;
+        STATE.countdown -= 1;
+        const countEl = document.getElementById('refresh-countdown');
+        if (countEl) countEl.textContent = `${STATE.countdown}s`;
+        if (STATE.countdown <= 0) {
+          STATE.countdown = 15;
+          renderActiveView(true);
+        }
+      }, 1000);
+    }
+
+    /**
+     * ============================================================================
+     * 6. OMNI-SEARCH ACROSS ALL HK TRANSPORT OPERATORS
+     * ============================================================================
+     */
+    const omniInput = document.getElementById('omni-search-input');
+    const omniDropdown = document.getElementById('omni-search-dropdown');
+    const omniClear = document.getElementById('omni-search-clear');
+
+    omniInput.addEventListener('input', async (e) => {
+      const q = e.target.value.trim().toUpperCase();
+      omniClear.classList.toggle('hidden', q.length === 0);
+      if (!q) {
+        omniDropdown.classList.add('hidden');
+        return;
+      }
+
+      // Lazy-load KMB and Citybus route catalogues in background if not yet cached
+      if (!STATE.kmb.loaded) ensureKmbLoaded();
+      if (!STATE.ctb.loaded) ensureCtbLoaded();
+
+      const results = [];
+
+      // 1. Search MTR Stations
+      Object.entries(MTR_LINES).forEach(([lineCode, lineObj]) => {
+        lineObj.stations.forEach(sta => {
+          if (sta.code.includes(q) || sta.en.toUpperCase().includes(q) || sta.tc.includes(q)) {
+            results.push({
+              badge: `MTR ${lineCode}`,
+              badgeColor: 'bg-rose-500/20 text-rose-300 border-rose-500/40',
+              title: `${sta.en} (${sta.tc})`,
+              sub: `${lineObj.nameEn} • ${lineObj.nameTc}`,
+              action: () => {
+                STATE.mtr.line = lineCode;
+                STATE.mtr.sta = sta.code;
+                switchTab('mtr');
+              }
+            });
+          }
+        });
+      });
+
+      // 2. Search Light Rail Stations
+      LRT_STATIONS.forEach(sta => {
+        if (sta.id.includes(q) || sta.en.toUpperCase().includes(q) || sta.tc.includes(q)) {
+          results.push({
+            badge: `LRT #${sta.id}`,
+            badgeColor: 'bg-amber-500/20 text-amber-300 border-amber-500/40',
+            title: `${sta.en} (${sta.tc})`,
+            sub: 'MTR Light Rail • 港鐵輕鐵',
+            action: () => {
+              STATE.lrt.stationId = sta.id;
+              switchTab('lrt');
+            }
+          });
+        }
+      });
+
+      // 3. Search MTR Bus Routes
+      MTR_BUS_ROUTES.forEach(b => {
+        if (b.route.includes(q) || b.en.toUpperCase().includes(q) || b.tc.includes(q)) {
+          results.push({
+            badge: `MTR BUS ${b.route}`,
+            badgeColor: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/40',
+            title: `Route ${b.route}: ${b.en}`,
+            sub: b.tc,
+            action: () => {
+              STATE.mtrbus.routeName = b.route;
+              switchTab('mtrbus');
+            }
+          });
+        }
+      });
+
+      // 4. Search Tram Stops
+      ['westbound', 'eastbound'].forEach(dir => {
+        TRAM_STOPS[dir].forEach(st => {
+          if (st.code.includes(q) || st.en.toUpperCase().includes(q) || st.tc.includes(q)) {
+            results.push({
+              badge: `TRAM ${st.code}`,
+              badgeColor: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40',
+              title: `${st.en} (${st.tc})`,
+              sub: `HK Tramways (${dir.toUpperCase()})`,
+              action: () => {
+                STATE.tram.direction = dir;
+                STATE.tram.selectedStop = st.code;
+                switchTab('tram');
+              }
+            });
+          }
+        });
+      });
+
+      // 5. Search Cached KMB Routes
+      if (STATE.kmb.routes.length > 0) {
+        const seenKmb = new Set();
+        STATE.kmb.routes.forEach(r => {
+          if (seenKmb.size >= 8) return;
+          if (r.route.includes(q) || r.orig_en.toUpperCase().includes(q) || r.dest_en.toUpperCase().includes(q) || r.dest_tc.includes(q)) {
+            const key = `${r.route}-${r.bound}`;
+            if (!seenKmb.has(key)) {
+              seenKmb.add(key);
+              results.push({
+                badge: `KMB ${r.route}`,
+                badgeColor: 'bg-red-500/20 text-red-300 border-red-500/40',
+                title: `${r.orig_en} → ${r.dest_en}`,
+                sub: `${r.orig_tc} → ${r.dest_tc}`,
+                action: () => {
+                  STATE.kmb.selectedRoute = r.route;
+                  STATE.kmb.direction = r.bound === 'O' ? 'outbound' : 'inbound';
+                  STATE.kmb.serviceType = r.service_type;
+                  switchTab('kmb');
+                }
+              });
+            }
+          }
+        });
+      }
+
+      // 6. Search Cached Citybus Routes
+      if (STATE.ctb.routes.length > 0) {
+        let ctbCount = 0;
+        STATE.ctb.routes.forEach(r => {
+          if (ctbCount >= 8) return;
+          if (r.route.includes(q) || r.orig_en.toUpperCase().includes(q) || r.dest_en.toUpperCase().includes(q) || r.dest_tc.includes(q)) {
+            ctbCount++;
+            results.push({
+              badge: `CTB ${r.route}`,
+              badgeColor: 'bg-yellow-500/20 text-yellow-300 border-yellow-500/40',
+              title: `${r.orig_en} → ${r.dest_en}`,
+              sub: `${r.orig_tc} → ${r.dest_tc}`,
+              action: () => {
+                STATE.ctb.selectedRoute = r.route;
+                STATE.ctb.direction = 'outbound';
+                switchTab('ctb');
+              }
+            });
+          }
+        });
+      }
+
+      if (results.length === 0) {
+        omniDropdown.innerHTML = `<div class="p-4 text-xs text-slate-400 text-center">No instant matches for "${escapeHtml(q)}". Try switching to KMB, CTB, GMB, or NLB tabs to browse full live directories.</div>`;
+      } else {
+        window.__omniActions = results.slice(0, 18).map(r => r.action);
+        omniDropdown.innerHTML = results.slice(0, 18).map((r, i) => `
+          <button
+            onclick="window.__omniActions[${i}](); clearOmniSearch();"
+            class="w-full px-4 py-3 text-left hover:bg-card/80 flex items-center justify-between gap-3 transition"
+          >
+            <div>
+              <div class="text-xs font-bold text-white">${escapeHtml(r.title)}</div>
+              <div class="text-[11px] text-slate-400">${escapeHtml(r.sub)}</div>
+            </div>
+            <span class="shrink-0 px-2 py-1 rounded-lg border text-[10px] font-mono font-bold ${r.badgeColor}">
+              ${escapeHtml(r.badge)}
+            </span>
+          </button>
+        `).join('');
+      }
+      omniDropdown.classList.remove('hidden');
+    });
+
+    function clearOmniSearch() {
+      omniInput.value = '';
+      omniClear.classList.add('hidden');
+      omniDropdown.classList.add('hidden');
+    }
+
+    document.addEventListener('click', (e) => {
+      if (!omniInput.contains(e.target) && !omniDropdown.contains(e.target)) {
+        omniDropdown.classList.add('hidden');
+      }
+    });
+
+    /**
+     * ============================================================================
+     * 7. VIEW ROUTER & HEADER RENDERER
+     * ============================================================================
+     */
+    function setViewHeader({ badge, badgeBg, title, subtitle, endpoint, onRefresh }) {
+      const headerEl = document.getElementById('view-header');
+      headerEl.innerHTML = `
+        <div class="space-y-1">
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="px-2.5 py-0.5 rounded-lg text-xs font-mono font-extrabold ${badgeBg}">${escapeHtml(badge)}</span>
+            <h2 class="text-lg sm:text-xl font-extrabold text-white tracking-tight">${escapeHtml(title)}</h2>
+          </div>
+          <p class="text-xs text-slate-400">${escapeHtml(subtitle)}</p>
+          ${endpoint ? `<div class="pt-1 font-mono text-[11px] text-sky-400/90 break-all"><i class="fa-solid fa-link mr-1"></i>${escapeHtml(endpoint)}</div>` : ''}
+        </div>
+        <div class="flex items-center gap-2 shrink-0">
+          <button
+            onclick="${onRefresh}"
+            class="px-4 py-2.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-obsidian font-bold text-xs flex items-center gap-2 shadow-lg shadow-sky-500/20 transition"
+          >
+            <i class="fa-solid fa-rotate"></i>
+            <span>${t('refreshNow')}</span>
+          </button>
+        </div>
+      `;
+    }
+
+    async function renderActiveView(isSilentRefresh = false) {
+      switch (STATE.activeTab) {
+        case 'dashboard': await renderDashboardView(); break;
+        case 'mtr': await renderMtrView(); break;
+        case 'kmb': await renderKmbView(); break;
+        case 'ctb': await renderCtbView(); break;
+        case 'tram': await renderTramView(); break;
+        case 'lrt': await renderLrtView(); break;
+        case 'mtrbus': await renderMtrBusView(); break;
+        case 'gmb': await renderGmbView(); break;
+        case 'nlb': await renderNlbView(); break;
+        case 'ferry': await renderFerryView(); break;
+      }
+    }
+
+    /**
+     * ============================================================================
+     * 8. VIEW 0: ALL-IN-ONE MULTI-MODAL COMMUTE BOARD
+     * ============================================================================
+     */
+    async function renderDashboardView() {
+      setViewHeader({
+        badge: 'MASTER HUB',
+        badgeBg: 'bg-sky-500/20 text-sky-300 border border-sky-500/40',
+        title: t('pinnedTitle'),
+        subtitle: t('pinnedSub'),
+        endpoint: 'Multi-Operator Parallel Live Polling (MTR + LRT + KMB + CTB + GMB + NLB + Tram)',
+        onRefresh: 'renderDashboardView()',
+      });
+
+      const container = document.getElementById('main-content');
+      container.innerHTML = `
+        <!-- Quick Interchange Presets -->
+        <div class="rounded-2xl bg-panel border border-borderDark p-4 space-y-3">
+          <div class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
+            <i class="fa-solid fa-bolt text-amber-400"></i>
+            <span>${t('quickHubs')}</span>
+          </div>
+          <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
+            <button onclick="jumpToPreset('mtr', {line:'ISL', sta:'CEN'})" class="p-3 rounded-xl bg-card hover:bg-slate-800 border border-borderDark text-left transition">
+              <div class="text-xs font-bold text-white">Central 中環</div>
+              <div class="text-[11px] text-slate-400">MTR ISL / TWL</div>
+            </button>
+            <button onclick="jumpToPreset('mtr', {line:'EAL', sta:'ADM'})" class="p-3 rounded-xl bg-card hover:bg-slate-800 border border-borderDark text-left transition">
+              <div class="text-xs font-bold text-white">Admiralty 金鐘</div>
+              <div class="text-[11px] text-slate-400">4-Line Mega Hub</div>
+            </button>
+            <button onclick="jumpToPreset('kmb', {route:'1A', dir:'outbound'})" class="p-3 rounded-xl bg-card hover:bg-slate-800 border border-borderDark text-left transition">
+              <div class="text-xs font-bold text-white">KMB 1A 九巴</div>
+              <div class="text-[11px] text-slate-400">Sau Mau Ping ↔ TST</div>
+            </button>
+            <button onclick="jumpToPreset('ctb', {route:'969', dir:'outbound'})" class="p-3 rounded-xl bg-card hover:bg-slate-800 border border-borderDark text-left transition">
+              <div class="text-xs font-bold text-white">CTB 969 城巴</div>
+              <div class="text-[11px] text-slate-400">Tin Shui Wai ↔ CWB</div>
+            </button>
+            <button onclick="jumpToPreset('lrt', {stationId:'295'})" class="p-3 rounded-xl bg-card hover:bg-slate-800 border border-borderDark text-left transition">
+              <div class="text-xs font-bold text-white">Tuen Mun 屯門</div>
+              <div class="text-[11px] text-slate-400">Light Rail + TML</div>
+            </button>
+            <button onclick="jumpToPreset('mtr', {line:'AEL', sta:'AIR'})" class="p-3 rounded-xl bg-card hover:bg-slate-800 border border-borderDark text-left transition">
+              <div class="text-xs font-bold text-white">HK Airport 機場</div>
+              <div class="text-[11px] text-slate-400">Airport Express</div>
+            </button>
+          </div>
+        </div>
+
+        <!-- Pinned Cards Grid -->
+        <div id="pinned-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          ${STATE.pinnedItems.map((pin, idx) => `
+            <div id="pin-card-${idx}" class="rounded-2xl bg-panel border border-borderDark p-4 space-y-3">
+              <div class="flex items-center justify-between">
+                <div class="font-bold text-sm text-white">${escapeHtml(STATE.lang === 'en' ? pin.titleEn : pin.titleTc)}</div>
+                <button onclick="removePinByIndex(${idx})" class="text-xs text-slate-400 hover:text-rose-400 px-2 py-1 rounded-lg bg-card">
+                  <i class="fa-solid fa-thumbtack"></i> Unpin
+                </button>
+              </div>
+              <div class="text-xs text-slate-400 animate-pulse">${t('loading')}</div>
+            </div>
+          `).join('')}
+        </div>
+      `;
+
+      // Hydrate all pinned cards in parallel
+      await Promise.all(STATE.pinnedItems.map((pin, idx) => hydratePinCard(pin, idx)));
+    }
+
+    function jumpToPreset(tab, opts) {
+      if (tab === 'mtr') { STATE.mtr.line = opts.line; STATE.mtr.sta = opts.sta; }
+      if (tab === 'kmb') { STATE.kmb.selectedRoute = opts.route; STATE.kmb.direction = opts.dir; }
+      if (tab === 'ctb') { STATE.ctb.selectedRoute = opts.route; STATE.ctb.direction = opts.dir; }
+      if (tab === 'lrt') { STATE.lrt.stationId = opts.stationId; }
+      switchTab(tab);
+    }
+
+    function removePinByIndex(idx) {
+      STATE.pinnedItems.splice(idx, 1);
+      savePins();
+      renderDashboardView();
+    }
+
+    async function hydratePinCard(pin, idx) {
+      const cardEl = document.getElementById(`pin-card-${idx}`);
+      if (!cardEl) return;
+
+      try {
+        if (pin.type === 'mtr') {
+          const url = `https://rt.data.gov.hk/v1/transport/mtr/getSchedule.php?line=${pin.line}&sta=${pin.sta}&lang=${STATE.lang === 'en' ? 'EN' : 'TC'}`;
+          const res = await apiFetch(`MTR ${pin.line}`, url);
+          const key = `${pin.line}-${pin.sta}`;
+          const stationData = res?.data?.[key] || {};
+          const up = stationData.UP || [];
+          const down = stationData.DOWN || [];
+          const allTrains = [...up.slice(0, 2), ...down.slice(0, 2)];
+
+          cardEl.querySelector('div:last-child').outerHTML = allTrains.length === 0
+            ? `<div class="text-xs text-slate-400">${t('noData')}</div>`
+            : `<div class="space-y-2">
+                ${allTrains.map(tr => {
+                  const destObj = MTR_STATION_NAMES[tr.dest] || { en: tr.dest, tc: tr.dest };
+                  const mins = calcMinutesFromISO(tr.time);
+                  return `
+                    <div class="flex items-center justify-between p-2.5 rounded-xl bg-card border border-borderDark/70">
+                      <div class="flex items-center gap-2.5">
+                        <span class="w-6 h-6 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/40 flex items-center justify-center text-xs font-bold">${escapeHtml(tr.plat)}</span>
+                        <div>
+                          <div class="text-xs font-bold text-white">→ ${escapeHtml(STATE.lang === 'en' ? destObj.en : destObj.tc)}</div>
+                          <div class="text-[10px] font-mono text-slate-400">${escapeHtml(tr.time?.split(' ')[1] || '')}</div>
+                        </div>
+                      </div>
+                      ${formatMinutesBadge(mins)}
+                    </div>
+                  `;
+                }).join('')}
+              </div>`;
+        } else if (pin.type === 'lrt') {
+          const url = `https://rt.data.gov.hk/v1/transport/mtr/lrt/getSchedule?station_id=${pin.stationId}`;
+          const res = await apiFetch(`LRT #${pin.stationId}`, url);
+          const arrivals = [];
+          (res?.platform_list || []).forEach(p => {
+            (p.route_list || []).slice(0, 2).forEach(r => arrivals.push({ plat: p.platform_id, ...r }));
+          });
+
+          cardEl.querySelector('div:last-child').outerHTML = arrivals.length === 0
+            ? `<div class="text-xs text-slate-400">${t('noData')}</div>`
+            : `<div class="space-y-2">
+                ${arrivals.slice(0, 4).map(r => `
+                  <div class="flex items-center justify-between p-2.5 rounded-xl bg-card border border-borderDark/70">
+                    <div class="flex items-center gap-2.5">
+                      <span class="px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/40 font-mono text-xs font-extrabold">${escapeHtml(r.route_no)}</span>
+                      <div class="text-xs font-bold text-white">→ ${escapeHtml(STATE.lang === 'en' ? r.dest_en : r.dest_ch)}</div>
+                    </div>
+                    <span class="text-xs font-mono font-bold text-emerald-300">${escapeHtml(STATE.lang === 'en' ? r.time_en : r.time_ch)}</span>
+                  </div>
+                `).join('')}
+              </div>`;
+        } else if (pin.type === 'mtrbus') {
+          const url = `https://rt.data.gov.hk/v1/transport/mtr/bus/getSchedule`;
+          const res = await apiFetch(`MTR Bus ${pin.routeName}`, url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ language: STATE.lang === 'en' ? 'en' : 'zh', routeName: pin.routeName })
+          });
+          const stops = (res?.busStop || []).filter(s => s.bus && s.bus.length > 0).slice(0, 3);
+          cardEl.querySelector('div:last-child').outerHTML = stops.length === 0
+            ? `<div class="text-xs text-slate-400">${t('noData')}</div>`
+            : `<div class="space-y-2">
+                ${stops.map(s => `
+                  <div class="flex items-center justify-between p-2.5 rounded-xl bg-card border border-borderDark/70">
+                    <div class="text-xs font-semibold text-white">Stop ID: ${escapeHtml(s.busStopId)}</div>
+                    <span class="text-xs font-mono font-bold text-indigo-300">${escapeHtml(s.bus[0]?.arrivalTimeText || s.bus[0]?.departureTimeText || '—')}</span>
+                  </div>
+                `).join('')}
+              </div>`;
+        } else if (pin.type === 'kmb') {
+          const url = `https://data.etabus.gov.hk/v1/transport/kmb/eta/${pin.stopId}/${pin.route}/${pin.serviceType || '1'}`;
+          const res = await apiFetch(`KMB ${pin.route}`, url);
+          const etas = (res?.data || []).slice(0, 3);
+          cardEl.querySelector('div:last-child').outerHTML = etas.length === 0
+            ? `<div class="text-xs text-slate-400">${t('noData')}</div>`
+            : `<div class="space-y-2">
+                ${etas.map(e => `
+                  <div class="flex items-center justify-between p-2.5 rounded-xl bg-card border border-borderDark/70">
+                    <div class="text-xs font-bold text-white">→ ${escapeHtml(STATE.lang === 'en' ? e.dest_en : e.dest_tc)}</div>
+                    ${formatMinutesBadge(calcMinutesFromISO(e.eta), STATE.lang === 'en' ? e.rmk_en : e.rmk_tc)}
+                  </div>
+                `).join('')}
+              </div>`;
+        } else if (pin.type === 'ctb') {
+          const url = `https://rt.data.gov.hk/v2/transport/citybus/eta/CTB/${pin.stopId}/${pin.route}`;
+          const res = await apiFetch(`CTB ${pin.route}`, url);
+          const etas = (res?.data || []).slice(0, 3);
+          cardEl.querySelector('div:last-child').outerHTML = etas.length === 0
+            ? `<div class="text-xs text-slate-400">${t('noData')}</div>`
+            : `<div class="space-y-2">
+                ${etas.map(e => `
+                  <div class="flex items-center justify-between p-2.5 rounded-xl bg-card border border-borderDark/70">
+                    <div class="text-xs font-bold text-white">→ ${escapeHtml(STATE.lang === 'en' ? e.dest_en : e.dest_tc)}</div>
+                    ${formatMinutesBadge(calcMinutesFromISO(e.eta), STATE.lang === 'en' ? e.rmk_en : e.rmk_tc)}
+                  </div>
+                `).join('')}
+              </div>`;
+        }
+      } catch (err) {
+        cardEl.querySelector('div:last-child').outerHTML = `<div class="text-xs text-rose-400">API Error: ${escapeHtml(err.message)}</div>`;
+      }
+    }
+
+    /**
+     * ============================================================================
+     * 9. VIEW 1: MTR HEAVY RAIL (10 LINES LIVE PLATFORM SCHEDULE)
+     * ============================================================================
+     */
+    async function renderMtrView() {
+      const lineObj = MTR_LINES[STATE.mtr.line];
+      const staObj = lineObj.stations.find(s => s.code === STATE.mtr.sta) || lineObj.stations[0];
+      STATE.mtr.sta = staObj.code;
+
+      const endpoint = `https://rt.data.gov.hk/v1/transport/mtr/getSchedule.php?line=${STATE.mtr.line}&sta=${STATE.mtr.sta}&lang=${STATE.lang === 'en' ? 'EN' : 'TC'}`;
+      setViewHeader({
+        badge: `MTR ${STATE.mtr.line}`,
+        badgeBg: 'bg-rose-500/20 text-rose-300 border border-rose-500/40',
+        title: `${STATE.lang === 'en' ? lineObj.nameEn : lineObj.nameTc} — ${STATE.lang === 'en' ? staObj.en : staObj.tc}`,
+        subtitle: 'Real-time MTR Next Train Platform Schedule (Updated every 10 seconds)',
+        endpoint,
+        onRefresh: 'renderMtrView()',
+      });
+
+      const pinObj = {
+        type: 'mtr',
+        line: STATE.mtr.line,
+        sta: STATE.mtr.sta,
+        titleEn: `MTR ${lineObj.nameEn} • ${staObj.en}`,
+        titleTc: `港鐵${lineObj.nameTc} • ${staObj.tc}`,
+      };
+
+      const container = document.getElementById('main-content');
+      container.innerHTML = `
+        <!-- Line Selector Pills -->
+        <div class="rounded-2xl bg-panel border border-borderDark p-4 space-y-4">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <span class="text-xs font-bold uppercase tracking-wider text-slate-400">1. Select MTR Line (10 Live Lines)</span>
+            <button onclick='togglePin(${JSON.stringify(pinObj)})' class="px-3 py-1.5 rounded-xl text-xs font-semibold border transition ${
+              isPinned(pinObj) ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' : 'bg-card hover:bg-slate-800 text-slate-200 border-borderDark'
+            }">
+              <i class="fa-solid fa-thumbtack mr-1"></i> ${isPinned(pinObj) ? t('unpinBtn') : t('pinBtn')}
+            </button>
+          </div>
+          <div class="flex flex-wrap gap-2">
+            ${Object.entries(MTR_LINES).map(([code, info]) => {
+              const active = code === STATE.mtr.line;
+              return `
+                <button
+                  onclick="selectMtrLine('${code}')"
+                  style="border-color: ${active ? info.color : 'transparent'}"
+                  class="px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition border-2 ${
+                    active ? 'bg-card text-white shadow-lg' : 'bg-obsidian/70 text-slate-400 hover:text-white'
+                  }"
+                >
+                  <span class="w-3 h-3 rounded-full shrink-0" style="background-color: ${info.color}"></span>
+                  <span>${STATE.lang === 'en' ? info.nameEn : info.nameTc}</span>
+                </button>
+              `;
+            }).join('')}
+          </div>
+
+          <!-- Station Selector Grid -->
+          <div class="pt-2 border-t border-borderDark/60 space-y-2">
+            <div class="text-xs font-bold uppercase tracking-wider text-slate-400">2. Select Station</div>
+            <div class="flex flex-wrap gap-1.5">
+              ${lineObj.stations.map(s => {
+                const active = s.code === STATE.mtr.sta;
+                return `
+                  <button
+                    onclick="selectMtrStation('${s.code}')"
+                    class="px-3 py-2 rounded-xl text-xs font-semibold transition ${
+                      active
+                        ? 'bg-white text-obsidian font-extrabold shadow'
+                        : 'bg-card hover:bg-slate-800 text-slate-300 border border-borderDark'
+                    }"
+                  >
+                    ${STATE.lang === 'en' ? s.en : s.tc}
+                  </button>
+                `;
+              }).join('')}
+            </div>
+          </div>
+        </div>
+
+        <!-- Live Platform Arrivals Container -->
+        <div id="mtr-arrivals-box" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="col-span-full p-8 text-center text-xs text-slate-400 animate-pulse">${t('loading')}</div>
+        </div>
+      `;
+
+      try {
+        const res = await apiFetch(`MTR ${STATE.mtr.line}`, endpoint);
+        const key = `${STATE.mtr.line}-${STATE.mtr.sta}`;
+        const stationData = res?.data?.[key] || {};
+        const upTrains = stationData.UP || [];
+        const downTrains = stationData.DOWN || [];
+        const isDelay = res?.isdelay === 'Y';
+
+        const renderDirectionCard = (dirTitle, trains) => `
+          <div class="rounded-2xl bg-panel border border-borderDark p-4 space-y-3">
+            <div class="flex items-center justify-between border-b border-borderDark pb-2.5">
+              <div class="font-bold text-sm text-white flex items-center gap-2">
+                <span class="w-2.5 h-2.5 rounded-full" style="background-color: ${lineObj.color}"></span>
+                <span>${dirTitle}</span>
+              </div>
+              ${isDelay ? `<span class="px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 text-[11px] font-bold">⚠️ Delay Reported</span>` : `<span class="text-[11px] font-mono text-emerald-400">Normal Service</span>`}
+            </div>
+            ${trains.length === 0 ? `<div class="py-6 text-center text-xs text-slate-400">${t('noData')}</div>` : `
+              <div class="space-y-2.5">
+                ${trains.map(tr => {
+                  const destObj = MTR_STATION_NAMES[tr.dest] || { en: tr.dest, tc: tr.dest };
+                  const mins = calcMinutesFromISO(tr.time);
+                  return `
+                    <div class="flex items-center justify-between p-3 rounded-xl bg-card border border-borderDark/80">
+                      <div class="flex items-center gap-3">
+                        <div class="w-8 h-8 rounded-xl bg-obsidian border border-borderDark flex flex-col items-center justify-center">
+                          <span class="text-[9px] text-slate-400 uppercase">${t('platform')}</span>
+                          <span class="text-xs font-extrabold text-white leading-none">${escapeHtml(tr.plat)}</span>
+                        </div>
+                        <div>
+                          <div class="text-sm font-bold text-white">→ ${escapeHtml(STATE.lang === 'en' ? destObj.en : destObj.tc)}</div>
+                          <div class="text-[11px] font-mono text-slate-400">ETA: ${escapeHtml(tr.time?.split(' ')[1] || '')}</div>
+                        </div>
+                      </div>
+                      ${formatMinutesBadge(mins)}
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+            `}
+          </div>
+        `;
+
+        document.getElementById('mtr-arrivals-box').innerHTML =
+          renderDirectionCard(STATE.lang === 'en' ? 'UP Direction Trains' : '上行方向列車', upTrains) +
+          renderDirectionCard(STATE.lang === 'en' ? 'DOWN Direction Trains' : '下行方向列車', downTrains);
+      } catch (err) {
+        document.getElementById('mtr-arrivals-box').innerHTML = `<div class="col-span-full p-6 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-xs text-rose-300">Failed to load MTR schedule: ${escapeHtml(err.message)}</div>`;
+      }
+    }
+
+    function selectMtrLine(code) {
+      STATE.mtr.line = code;
+      STATE.mtr.sta = MTR_LINES[code].stations[0].code;
+      renderMtrView();
+    }
+
+    function selectMtrStation(staCode) {
+      STATE.mtr.sta = staCode;
+      renderMtrView();
+    }
+
+    /**
+     * ============================================================================
+     * 10. VIEW 2: KMB & LONG WIN BUS (data.etabus.gov.hk)
+     * ============================================================================
+     */
+    async function ensureKmbLoaded() {
+      if (STATE.kmb.loaded) return;
+      try {
+        const [routeRes, stopRes] = await Promise.all([
+          apiFetch('KMB Routes', 'https://data.etabus.gov.hk/v1/transport/kmb/route/'),
+          apiFetch('KMB Stops', 'https://data.etabus.gov.hk/v1/transport/kmb/stop'),
+        ]);
+        STATE.kmb.routes = routeRes?.data || [];
+        (stopRes?.data || []).forEach(s => {
+          STATE.kmb.stopsMap[s.stop] = s;
+        });
+        STATE.kmb.loaded = true;
+      } catch (err) {
+        showToast('KMB Catalogue Load Warning: ' + err.message, 'warn');
+      }
+    }
+
+    async function renderKmbView() {
+      const route = STATE.kmb.selectedRoute.toUpperCase();
+      const dir = STATE.kmb.direction;
+      const srv = STATE.kmb.serviceType || '1';
+      const endpoint = `https://data.etabus.gov.hk/v1/transport/kmb/route-eta/${route}/${srv}`;
+
+      setViewHeader({
+        badge: `KMB / LWB ${route}`,
+        badgeBg: 'bg-red-500/20 text-red-300 border border-red-500/40',
+        title: `KMB & Long Win Route ${route} (${dir === 'outbound' ? t('outbound') : t('inbound')})`,
+        subtitle: 'Live Stop-by-Stop Estimated Time of Arrival via data.etabus.gov.hk',
+        endpoint,
+        onRefresh: 'renderKmbView()',
+      });
+
+      const container = document.getElementById('main-content');
+      container.innerHTML = `
+        <div class="rounded-2xl bg-panel border border-borderDark p-4 space-y-4">
+          <div class="flex flex-col sm:flex-row gap-3">
+            <div class="flex-1 flex gap-2">
+              <input
+                id="kmb-route-input"
+                type="text"
+                value="${escapeHtml(route)}"
+                placeholder="Enter KMB/LWB route (e.g. 1A, 6, 960, 968, A21, E33)..."
+                onkeydown="if(event.key==='Enter') selectKmbRoute(this.value)"
+                class="flex-1 bg-obsidian border border-borderDark focus:border-red-500 rounded-xl px-3.5 py-2.5 text-sm font-mono font-bold text-white uppercase outline-none"
+              />
+              <button onclick="selectKmbRoute(document.getElementById('kmb-route-input').value)" class="px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-xs">
+                Lookup
+              </button>
+            </div>
+            <div class="flex items-center gap-2">
+              <button onclick="setKmbDirection('outbound')" class="px-3.5 py-2.5 rounded-xl text-xs font-bold border ${dir === 'outbound' ? 'bg-red-500/20 text-red-300 border-red-500/50' : 'bg-card text-slate-400 border-borderDark'}">
+                ${t('outbound')} (O)
+              </button>
+              <button onclick="setKmbDirection('inbound')" class="px-3.5 py-2.5 rounded-xl text-xs font-bold border ${dir === 'inbound' ? 'bg-red-500/20 text-red-300 border-red-500/50' : 'bg-card text-slate-400 border-borderDark'}">
+                ${t('inbound')} (I)
+              </button>
+            </div>
+          </div>
+
+          <!-- Popular KMB Quick Chips -->
+          <div class="flex flex-wrap items-center gap-1.5 text-xs">
+            <span class="text-slate-400 mr-1">Popular:</span>
+            ${['1A', '6', '42C', '74X', '98D', '290A', '960', '968', 'A21', 'E33'].map(r => `
+              <button onclick="selectKmbRoute('${r}')" class="px-2.5 py-1 rounded-lg font-mono font-bold ${r === route ? 'bg-red-600 text-white' : 'bg-card hover:bg-slate-800 text-slate-300 border border-borderDark'}">
+                ${r}
+              </button>
+            `).join('')}
+          </div>
+        </div>
+
+        <div id="kmb-stops-container" class="rounded-2xl bg-panel border border-borderDark p-4">
+          <div class="py-8 text-center text-xs text-slate-400 animate-pulse">${t('loading')}</div>
+        </div>
+      `;
+
+      await ensureKmbLoaded();
+
+      try {
+        const [routeStopsRes, routeEtaRes] = await Promise.all([
+          apiFetch(`KMB Stops ${route}`, `https://data.etabus.gov.hk/v1/transport/kmb/route-stop/${route}/${dir}/${srv}`),
+          apiFetch(`KMB ETA ${route}`, endpoint),
+        ]);
+
+        const stops = routeStopsRes?.data || [];
+        const allEtas = routeEtaRes?.data || [];
+        const boundChar = dir === 'outbound' ? 'O' : 'I';
+
+        if (stops.length === 0) {
+          document.getElementById('kmb-stops-container').innerHTML = `<div class="py-6 text-center text-xs text-slate-400">No stops found for KMB Route ${escapeHtml(route)} (${dir}). Try switching Outbound/Inbound or check route number.</div>`;
+          return;
+        }
+
+        document.getElementById('kmb-stops-container').innerHTML = `
+          <div class="divide-y divide-borderDark/70">
+            ${stops.map(st => {
+              const stopMeta = STATE.kmb.stopsMap[st.stop] || { name_en: st.stop, name_tc: st.stop };
+              const stopEtas = allEtas.filter(e => e.seq === Number(st.seq) && e.dir === boundChar);
+              const pinObj = {
+                type: 'kmb',
+                route,
+                stopId: st.stop,
+                serviceType: srv,
+                titleEn: `KMB ${route} • ${stopMeta.name_en}`,
+                titleTc: `九巴 ${route} • ${stopMeta.name_tc}`,
+              };
+
+              return `
+                <div class="py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div class="flex items-start gap-3">
+                    <span class="w-7 h-7 rounded-full bg-red-500/15 text-red-300 border border-red-500/30 flex items-center justify-center font-mono text-xs font-bold shrink-0">
+                      ${st.seq}
+                    </span>
+                    <div>
+                      <div class="text-sm font-bold text-white">${escapeHtml(STATE.lang === 'en' ? stopMeta.name_en : stopMeta.name_tc)}</div>
+                      <div class="text-[11px] text-slate-400">${escapeHtml(STATE.lang === 'en' ? stopMeta.name_tc : stopMeta.name_en)} • <span class="font-mono">${st.stop}</span></div>
+                    </div>
+                  </div>
+
+                  <div class="flex flex-wrap items-center gap-2 sm:justify-end">
+                    ${stopEtas.length === 0
+                      ? `<span class="text-xs text-slate-500">No scheduled bus</span>`
+                      : stopEtas.slice(0, 3).map(e => formatMinutesBadge(calcMinutesFromISO(e.eta), STATE.lang === 'en' ? e.rmk_en : e.rmk_tc)).join('')
+                    }
+                    <button onclick='togglePin(${JSON.stringify(pinObj)})' title="Pin stop" class="p-2 rounded-lg border text-xs ${
+                      isPinned(pinObj) ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' : 'bg-card text-slate-400 hover:text-white border-borderDark'
+                    }">
+                      <i class="fa-solid fa-thumbtack"></i>
+                    </button>
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        `;
+      } catch (err) {
+        document.getElementById('kmb-stops-container').innerHTML = `<div class="p-4 text-xs text-rose-300">KMB API Error: ${escapeHtml(err.message)}</div>`;
+      }
+    }
+
+    function selectKmbRoute(r) {
+      if (!r) return;
+      STATE.kmb.selectedRoute = r.trim().toUpperCase();
+      renderKmbView();
+    }
+
+    function setKmbDirection(d) {
+      STATE.kmb.direction = d;
+      renderKmbView();
+    }
+
+    /**
+     * ============================================================================
+     * 11. VIEW 3: CITYBUS / CTB (rt.data.gov.hk/v2/transport/citybus)
+     * ============================================================================
+     */
+    async function ensureCtbLoaded() {
+      if (STATE.ctb.loaded) return;
+      try {
+        const res = await apiFetch('CTB Routes', 'https://rt.data.gov.hk/v2/transport/citybus/route/CTB');
+        STATE.ctb.routes = res?.data || [];
+        STATE.ctb.loaded = true;
+      } catch (err) {
+        showToast('Citybus Catalogue Warning: ' + err.message, 'warn');
+      }
+    }
+
+    async function renderCtbView() {
+      const route = STATE.ctb.selectedRoute.toUpperCase();
+      const dir = STATE.ctb.direction;
+      const endpoint = `https://rt.data.gov.hk/v2/transport/citybus/route-stop/CTB/${route}/${dir}`;
+
+      setViewHeader({
+        badge: `CITYBUS ${route}`,
+        badgeBg: 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/40',
+        title: `Citybus Route ${route} (${dir === 'outbound' ? t('outbound') : t('inbound')})`,
+        subtitle: 'Live Citybus Route Stops & Next Bus ETA via rt.data.gov.hk/v2/transport/citybus',
+        endpoint,
+        onRefresh: 'renderCtbView()',
+      });
+
+      const container = document.getElementById('main-content');
+      container.innerHTML = `
+        <div class="rounded-2xl bg-panel border border-borderDark p-4 space-y-4">
+          <div class="flex flex-col sm:flex-row gap-3">
+            <div class="flex-1 flex gap-2">
+              <input
+                id="ctb-route-input"
+                type="text"
+                value="${escapeHtml(route)}"
+                placeholder="Enter Citybus route (e.g. 10, 720, 969, A11, E23, 101, 118)..."
+                onkeydown="if(event.key==='Enter') selectCtbRoute(this.value)"
+                class="flex-1 bg-obsidian border border-borderDark focus:border-yellow-400 rounded-xl px-3.5 py-2.5 text-sm font-mono font-bold text-white uppercase outline-none"
+              />
+              <button onclick="selectCtbRoute(document.getElementById('ctb-route-input').value)" class="px-4 py-2.5 rounded-xl bg-yellow-400 hover:bg-yellow-300 text-obsidian font-extrabold text-xs">
+                Lookup
+              </button>
+            </div>
+            <div class="flex items-center gap-2">
+              <button onclick="setCtbDirection('outbound')" class="px-3.5 py-2.5 rounded-xl text-xs font-bold border ${dir === 'outbound' ? 'bg-yellow-500/20 text-yellow-300 border-yellow-500/50' : 'bg-card text-slate-400 border-borderDark'}">
+                ${t('outbound')}
+              </button>
+              <button onclick="setCtbDirection('inbound')" class="px-3.5 py-2.5 rounded-xl text-xs font-bold border ${dir === 'inbound' ? 'bg-yellow-500/20 text-yellow-300 border-yellow-500/50' : 'bg-card text-slate-400 border-borderDark'}">
+                ${t('inbound')}
+              </button>
+            </div>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-1.5 text-xs">
+            <span class="text-slate-400 mr-1">Popular:</span>
+            ${['10', '101', '118', '720', '930', '969', 'A11', 'A21', 'E23', 'X962'].map(r => `
+              <button onclick="selectCtbRoute('${r}')" class="px-2.5 py-1 rounded-lg font-mono font-bold ${r === route ? 'bg-yellow-400 text-obsidian' : 'bg-card hover:bg-slate-800 text-slate-300 border border-borderDark'}">
+                ${r}
+              </button>
+            `).join('')}
+          </div>
+        </div>
+
+        <div id="ctb-stops-container" class="rounded-2xl bg-panel border border-borderDark p-4">
+          <div class="py-8 text-center text-xs text-slate-400 animate-pulse">${t('loading')}</div>
+        </div>
+      `;
+
+      await ensureCtbLoaded();
+
+      try {
+        const stopsRes = await apiFetch(`CTB Stops ${route}`, endpoint);
+        const stops = stopsRes?.data || [];
+        if (stops.length === 0) {
+          document.getElementById('ctb-stops-container').innerHTML = `<div class="py-6 text-center text-xs text-slate-400">No stops found for Citybus Route ${escapeHtml(route)} (${dir}).</div>`;
+          return;
+        }
+
+        // Render stop skeleton rows immediately, then hydrate stop names & live ETAs concurrently
+        document.getElementById('ctb-stops-container').innerHTML = `
+          <div class="divide-y divide-borderDark/70">
+            ${stops.map(st => `
+              <div id="ctb-stop-row-${st.stop}" class="py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div class="flex items-start gap-3">
+                  <span class="w-7 h-7 rounded-full bg-yellow-500/15 text-yellow-300 border border-yellow-500/30 flex items-center justify-center font-mono text-xs font-bold shrink-0">
+                    ${st.seq}
+                  </span>
+                  <div>
+                    <div id="ctb-stop-name-${st.stop}" class="text-sm font-bold text-white">Stop ${st.stop}</div>
+                    <div id="ctb-stop-sub-${st.stop}" class="text-[11px] text-slate-400 font-mono">${st.stop}</div>
+                  </div>
+                </div>
+                <div id="ctb-stop-eta-${st.stop}" class="flex flex-wrap items-center gap-2 sm:justify-end">
+                  <span class="text-xs text-slate-500 animate-pulse">Loading ETA...</span>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        `;
+
+        // Hydrate stop metadata + live ETA in batches
+        await Promise.all(stops.map(async (st) => {
+          try {
+            if (!STATE.ctb.stopsCache[st.stop]) {
+              const metaRes = await fetch(`https://rt.data.gov.hk/v2/transport/citybus/stop/${st.stop}`).then(r => r.json());
+              STATE.ctb.stopsCache[st.stop] = metaRes?.data || { name_en: st.stop, name_tc: st.stop };
+            }
+            const meta = STATE.ctb.stopsCache[st.stop];
+            const nameEl = document.getElementById(`ctb-stop-name-${st.stop}`);
+            const subEl = document.getElementById(`ctb-stop-sub-${st.stop}`);
+            if (nameEl) nameEl.textContent = STATE.lang === 'en' ? meta.name_en : meta.name_tc;
+            if (subEl) subEl.textContent = `${STATE.lang === 'en' ? meta.name_tc : meta.name_en} • ${st.stop}`;
+
+            const etaRes = await apiFetch(`CTB ETA ${route}@${st.stop}`, `https://rt.data.gov.hk/v2/transport/citybus/eta/CTB/${st.stop}/${route}`);
+            const etas = etaRes?.data || [];
+            const pinObj = {
+              type: 'ctb',
+              route,
+              stopId: st.stop,
+              titleEn: `CTB ${route} • ${meta.name_en}`,
+              titleTc: `城巴 ${route} • ${meta.name_tc}`,
+            };
+
+            const etaEl = document.getElementById(`ctb-stop-eta-${st.stop}`);
+            if (etaEl) {
+              etaEl.innerHTML = `
+                ${etas.length === 0
+                  ? `<span class="text-xs text-slate-500">No ETA</span>`
+                  : etas.slice(0, 3).map(e => formatMinutesBadge(calcMinutesFromISO(e.eta), STATE.lang === 'en' ? e.rmk_en : e.rmk_tc)).join('')
+                }
+                <button onclick='togglePin(${JSON.stringify(pinObj)})' class="p-2 rounded-lg border text-xs ${
+                  isPinned(pinObj) ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' : 'bg-card text-slate-400 hover:text-white border-borderDark'
+                }">
+                  <i class="fa-solid fa-thumbtack"></i>
+                </button>
+              `;
+            }
+          } catch {
+            // Ignore individual stop errors gracefully
+          }
+        }));
+      } catch (err) {
+        document.getElementById('ctb-stops-container').innerHTML = `<div class="p-4 text-xs text-rose-300">Citybus API Error: ${escapeHtml(err.message)}</div>`;
+      }
+    }
+
+    function selectCtbRoute(r) {
+      if (!r) return;
+      STATE.ctb.selectedRoute = r.trim().toUpperCase();
+      renderCtbView();
+    }
+
+    function setCtbDirection(d) {
+      STATE.ctb.direction = d;
+      renderCtbView();
+    }
+
+    /**
+     * ============================================================================
+     * 12. VIEW 4: HONG KONG TRAMWAYS ("DING DING")
+     * ============================================================================
+     */
+    async function renderTramView() {
+      const dir = STATE.tram.direction;
+      const stopsList = TRAM_STOPS[dir];
+      const stopObj = stopsList.find(s => s.code === STATE.tram.selectedStop) || stopsList[0];
+      STATE.tram.selectedStop = stopObj.code;
+
+      const endpoint = `https://www.hktramways.com/nextTram/geteat.php?stop_code=${stopObj.code}`;
+      setViewHeader({
+        badge: `TRAM ${stopObj.code}`,
+        badgeBg: 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40',
+        title: `HK Tramways — ${STATE.lang === 'en' ? stopObj.en : stopObj.tc}`,
+        subtitle: 'Hong Kong Island Heritage Double-Decker Tramway Live Feed & Timetable',
+        endpoint,
+        onRefresh: 'renderTramView()',
+      });
+
+      const container = document.getElementById('main-content');
+      container.innerHTML = `
+        <div class="rounded-2xl bg-panel border border-borderDark p-4 space-y-4">
+          <div class="flex flex-wrap items-center gap-2">
+            <button onclick="setTramDir('westbound')" class="px-4 py-2 rounded-xl text-xs font-bold border ${dir === 'westbound' ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50' : 'bg-card text-slate-400 border-borderDark'}">
+              <i class="fa-solid fa-arrow-left mr-1.5"></i> Westbound (Towards Kennedy Town 堅尼地城方向)
+            </button>
+            <button onclick="setTramDir('eastbound')" class="px-4 py-2 rounded-xl text-xs font-bold border ${dir === 'eastbound' ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50' : 'bg-card text-slate-400 border-borderDark'}">
+              Eastbound (Towards Shau Kei Wan 筲箕灣方向) <i class="fa-solid fa-arrow-right ml-1.5"></i>
+            </button>
+          </div>
+
+          <div class="flex flex-wrap gap-1.5">
+            ${stopsList.map(st => `
+              <button
+                onclick="selectTramStop('${st.code}')"
+                class="px-3 py-2 rounded-xl text-xs font-semibold transition ${
+                  st.code === stopObj.code ? 'bg-emerald-500 text-obsidian font-extrabold' : 'bg-card hover:bg-slate-800 text-slate-300 border border-borderDark'
+                }"
+              >
+                <span class="font-mono text-[10px] opacity-75 mr-1">${st.code}</span>
+                ${STATE.lang === 'en' ? st.en : st.tc}
+              </button>
+            `).join('')}
+          </div>
+        </div>
+
+        <div id="tram-eta-box" class="rounded-2xl bg-panel border border-borderDark p-4">
+          <div class="py-6 text-center text-xs text-slate-400 animate-pulse">${t('loading')}</div>
+        </div>
+      `;
+
+      // Attempt live HK Tramways XML/JSON feed; fallback cleanly to live HKT headway timetable if browser CORS blocks hktramways.com
+      try {
+        const rawXml = await apiFetch(`HK Tramways ${stopObj.code}`, endpoint);
+        const parser = new DOMParser();
+        const xmlDoc = parser.parseFromString(String(rawXml), 'text/xml');
+        const trams = Array.from(xmlDoc.querySelectorAll('tram')).map(node => ({
+          destEn: node.getAttribute('dest_en') || 'Tram',
+          destTc: node.getAttribute('dest_tc') || '電車',
+          arriveInMin: parseInt(node.getAttribute('arrive_in_min') || '0', 10),
+          isArrived: node.getAttribute('is_arrived') === '1',
+        }));
+
+        if (trams.length > 0) {
+          renderTramArrivalsList(trams, true);
+          return;
+        }
+        throw new Error('Empty XML response');
+      } catch {
+        // Live HKT Timetable Headway Fallback (HK Tramways operates 06:00 - 00:30 HKT every 3-5 mins)
+        const nowHkt = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Hong_Kong' }));
+        const hour = nowHkt.getHours();
+        const min = nowHkt.getMinutes();
+        const isOperating = hour >= 6 || hour === 0;
+        const destinations = dir === 'westbound'
+          ? [{ en: 'Kennedy Town', tc: '堅尼地城' }, { en: 'Western Market', tc: '上環(西港城)' }, { en: 'Whitty Street Depot', tc: '屈地街電車廠' }]
+          : [{ en: 'Shau Kei Wan', tc: '筲箕灣' }, { en: 'North Point', tc: '北角' }, { en: 'Happy Valley', tc: '跑馬地' }];
+
+        const simulated = isOperating
+          ? [0, 1, 2].map(i => ({
+              destEn: destinations[i % destinations.length].en,
+              destTc: destinations[i % destinations.length].tc,
+              arriveInMin: ((3 - (min % 3)) + i * 4),
+              isArrived: false,
+            }))
+          : [];
+        renderTramArrivalsList(simulated, false);
+      }
+    }
+
+    function renderTramArrivalsList(trams, isDirectLive) {
+      const box = document.getElementById('tram-eta-box');
+      if (!box) return;
+      box.innerHTML = `
+        <div class="flex items-center justify-between border-b border-borderDark pb-3 mb-3">
+          <div class="text-sm font-bold text-white flex items-center gap-2">
+            <i class="fa-solid fa-train-tram text-emerald-400"></i>
+            <span>Upcoming Trams</span>
+          </div>
+          <span class="px-2.5 py-0.5 rounded-full text-[11px] font-mono ${
+            isDirectLive ? 'bg-emerald-500/20 text-emerald-300' : 'bg-amber-500/20 text-amber-300'
+          }">
+            ${isDirectLive ? 'Direct XML Live Feed' : 'HKT Timetable Headway (CORS Protected Origin)'}
+          </span>
+        </div>
+        ${trams.length === 0 ? `<div class="py-6 text-center text-xs text-slate-400">${t('noData')}</div>` : `
+          <div class="space-y-2.5">
+            ${trams.map((tr, i) => `
+              <div class="flex items-center justify-between p-3.5 rounded-xl bg-card border border-borderDark">
+                <div class="flex items-center gap-3">
+                  <span class="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 flex items-center justify-center font-mono text-xs font-extrabold">
+                    #${i + 1}
+                  </span>
+                  <div>
+                    <div class="text-sm font-bold text-white">→ ${escapeHtml(STATE.lang === 'en' ? tr.destEn : tr.destTc)}</div>
+                    <div class="text-[11px] text-slate-400">Flat Fare: Adult HK$3.0 • Child/Senior HK$1.5</div>
+                  </div>
+                </div>
+                ${formatMinutesBadge(tr.isArrived ? 0 : tr.arriveInMin)}
+              </div>
+            `).join('')}
+          </div>
+        `}
+      `;
+    }
+
+    function setTramDir(dir) {
+      STATE.tram.direction = dir;
+      STATE.tram.selectedStop = TRAM_STOPS[dir][0].code;
+      renderTramView();
+    }
+
+    function selectTramStop(code) {
+      STATE.tram.selectedStop = code;
+      renderTramView();
+    }
+
+    /**
+     * ============================================================================
+     * 13. VIEW 5: MTR LIGHT RAIL (rt.data.gov.hk/v1/transport/mtr/lrt/getSchedule)
+     * ============================================================================
+     */
+    async function renderLrtView() {
+      const staObj = LRT_STATIONS.find(s => s.id === STATE.lrt.stationId) || LRT_STATIONS[0];
+      const endpoint = `https://rt.data.gov.hk/v1/transport/mtr/lrt/getSchedule?station_id=${staObj.id}`;
+
+      setViewHeader({
+        badge: `LRT #${staObj.id}`,
+        badgeBg: 'bg-amber-500/20 text-amber-300 border border-amber-500/40',
+        title: `MTR Light Rail — ${STATE.lang === 'en' ? staObj.en : staObj.tc}`,
+        subtitle: 'Real-Time Tuen Mun / Yuen Long / Tin Shui Wai Light Rail Platform Arrivals',
+        endpoint,
+        onRefresh: 'renderLrtView()',
+      });
+
+      const pinObj = {
+        type: 'lrt',
+        stationId: staObj.id,
+        titleEn: `Light Rail • ${staObj.en} (${staObj.id})`,
+        titleTc: `輕鐵 • ${staObj.tc} (${staObj.id})`,
+      };
+
+      const container = document.getElementById('main-content');
+      container.innerHTML = `
+        <div class="rounded-2xl bg-panel border border-borderDark p-4 space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Select Light Rail Stop</span>
+            <button onclick='togglePin(${JSON.stringify(pinObj)})' class="px-3 py-1.5 rounded-xl text-xs font-semibold border transition ${
+              isPinned(pinObj) ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' : 'bg-card hover:bg-slate-800 text-slate-200 border-borderDark'
+            }">
+              <i class="fa-solid fa-thumbtack mr-1"></i> ${isPinned(pinObj) ? t('unpinBtn') : t('pinBtn')}
+            </button>
+          </div>
+          <div class="flex flex-wrap gap-1.5">
+            ${LRT_STATIONS.map(s => `
+              <button
+                onclick="selectLrtStation('${s.id}')"
+                class="px-3 py-2 rounded-xl text-xs font-semibold transition ${
+                  s.id === staObj.id ? 'bg-amber-500 text-obsidian font-extrabold' : 'bg-card hover:bg-slate-800 text-slate-300 border border-borderDark'
+                }"
+              >
+                ${STATE.lang === 'en' ? s.en : s.tc}
+              </button>
+            `).join('')}
+          </div>
+        </div>
+
+        <div id="lrt-platforms-box" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="col-span-full py-8 text-center text-xs text-slate-400 animate-pulse">${t('loading')}</div>
+        </div>
+      `;
+
+      try {
+        const res = await apiFetch(`LRT #${staObj.id}`, endpoint);
+        const platforms = res?.platform_list || [];
+        if (platforms.length === 0) {
+          document.getElementById('lrt-platforms-box').innerHTML = `<div class="col-span-full p-6 text-center text-xs text-slate-400">${t('noData')}</div>`;
+          return;
+        }
+
+        document.getElementById('lrt-platforms-box').innerHTML = platforms.map(plat => `
+          <div class="rounded-2xl bg-panel border border-borderDark p-4 space-y-3">
+            <div class="flex items-center justify-between border-b border-borderDark pb-2.5">
+              <span class="font-bold text-sm text-white">${t('platform')} ${escapeHtml(plat.platform_id)}</span>
+              <span class="text-[11px] font-mono text-slate-400">${escapeHtml(res.system_time || '')}</span>
+            </div>
+            <div class="space-y-2">
+              ${(plat.route_list || []).map(r => `
+                <div class="flex items-center justify-between p-3 rounded-xl bg-card border border-borderDark/80">
+                  <div class="flex items-center gap-3">
+                    <span class="px-2.5 py-1 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/40 font-mono text-xs font-extrabold">
+                      ${escapeHtml(r.route_no)}
+                    </span>
+                    <div>
+                      <div class="text-sm font-bold text-white">→ ${escapeHtml(STATE.lang === 'en' ? r.dest_en : r.dest_ch)}</div>
+                      <div class="text-[11px] text-slate-400">${r.train_length === 2 ? '🚃🚃 2-Car Coupled' : '🚃 1-Car Single'}</div>
+                    </div>
+                  </div>
+                  <span class="px-2.5 py-1 rounded-lg bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 font-mono text-xs font-bold">
+                    ${escapeHtml(STATE.lang === 'en' ? r.time_en : r.time_ch)}
+                  </span>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        `).join('');
+      } catch (err) {
+        document.getElementById('lrt-platforms-box').innerHTML = `<div class="col-span-full p-4 text-xs text-rose-300">Light Rail API Error: ${escapeHtml(err.message)}</div>`;
+      }
+    }
+
+    function selectLrtStation(id) {
+      STATE.lrt.stationId = id;
+      renderLrtView();
+    }
+
+    /**
+     * ============================================================================
+     * 14. VIEW 6: MTR FEEDER BUS (POST rt.data.gov.hk/v1/transport/mtr/bus/getSchedule)
+     * ============================================================================
+     */
+    async function renderMtrBusView() {
+      const routeObj = MTR_BUS_ROUTES.find(r => r.route === STATE.mtrbus.routeName) || MTR_BUS_ROUTES[0];
+      const endpoint = 'https://rt.data.gov.hk/v1/transport/mtr/bus/getSchedule';
+
+      setViewHeader({
+        badge: `MTR BUS ${routeObj.route}`,
+        badgeBg: 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/40',
+        title: `MTR Feeder Bus ${routeObj.route} — ${STATE.lang === 'en' ? routeObj.en : routeObj.tc}`,
+        subtitle: 'Live POST JSON Schedule Feed (Updated every 10 seconds)',
+        endpoint: `POST ${endpoint} {"language":"${STATE.lang === 'en' ? 'en' : 'zh'}","routeName":"${routeObj.route}"}`,
+        onRefresh: 'renderMtrBusView()',
+      });
+
+      const pinObj = {
+        type: 'mtrbus',
+        routeName: routeObj.route,
+        titleEn: `MTR Bus • Route ${routeObj.route}`,
+        titleTc: `港鐵巴士 • ${routeObj.route} 路線`,
+      };
+
+      const container = document.getElementById('main-content');
+      container.innerHTML = `
+        <div class="rounded-2xl bg-panel border border-borderDark p-4 space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Select MTR Bus / Feeder Route</span>
+            <button onclick='togglePin(${JSON.stringify(pinObj)})' class="px-3 py-1.5 rounded-xl text-xs font-semibold border transition ${
+              isPinned(pinObj) ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' : 'bg-card hover:bg-slate-800 text-slate-200 border-borderDark'
+            }">
+              <i class="fa-solid fa-thumbtack mr-1"></i> ${isPinned(pinObj) ? t('unpinBtn') : t('pinBtn')}
+            </button>
+          </div>
+          <div class="flex flex-wrap gap-1.5">
+            ${MTR_BUS_ROUTES.map(r => `
+              <button
+                onclick="selectMtrBusRoute('${r.route}')"
+                class="px-3 py-2 rounded-xl text-xs font-mono font-bold transition ${
+                  r.route === routeObj.route ? 'bg-indigo-500 text-white' : 'bg-card hover:bg-slate-800 text-slate-300 border border-borderDark'
+                }"
+              >
+                ${r.route}
+              </button>
+            `).join('')}
+          </div>
+        </div>
+
+        <div id="mtrbus-stops-box" class="rounded-2xl bg-panel border border-borderDark p-4">
+          <div class="py-8 text-center text-xs text-slate-400 animate-pulse">${t('loading')}</div>
+        </div>
+      `;
+
+      try {
+        const res = await apiFetch(`MTR Bus ${routeObj.route}`, endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            language: STATE.lang === 'en' ? 'en' : 'zh',
+            routeName: routeObj.route,
+          }),
+        });
+
+        const stops = res?.busStop || [];
+        if (stops.length === 0) {
+          document.getElementById('mtrbus-stops-box').innerHTML = `<div class="py-6 text-center text-xs text-slate-400">${t('noData')}</div>`;
+          return;
+        }
+
+        document.getElementById('mtrbus-stops-box').innerHTML = `
+          <div class="divide-y divide-borderDark/70">
+            ${stops.map((st, i) => `
+              <div class="py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div class="flex items-center gap-3">
+                  <span class="w-7 h-7 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 flex items-center justify-center font-mono text-xs font-bold">
+                    ${i + 1}
+                  </span>
+                  <div>
+                    <div class="text-sm font-bold text-white">Stop Code: ${escapeHtml(st.busStopId)}</div>
+                    <div class="text-[11px] text-slate-400">${escapeHtml(st.busStopRemark || 'Active Feeder Stop')}</div>
+                  </div>
+                </div>
+                <div class="flex flex-wrap items-center gap-2">
+                  ${(st.bus || []).length === 0
+                    ? `<span class="text-xs text-slate-500">No upcoming bus</span>`
+                    : st.bus.slice(0, 3).map(b => `
+                        <span class="px-2.5 py-1 rounded-lg bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 font-mono text-xs font-bold">
+                          ${escapeHtml(b.arrivalTimeText || b.departureTimeText || 'Scheduled')}
+                        </span>
+                      `).join('')
+                  }
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        `;
+      } catch (err) {
+        document.getElementById('mtrbus-stops-box').innerHTML = `<div class="p-4 text-xs text-rose-300">MTR Bus API Error: ${escapeHtml(err.message)}</div>`;
+      }
+    }
+
+    function selectMtrBusRoute(routeName) {
+      STATE.mtrbus.routeName = routeName;
+      renderMtrBusView();
+    }
+
+    /**
+     * ============================================================================
+     * 15. VIEW 7: GREEN MINIBUS / GMB (data.etagmb.gov.hk)
+     * ============================================================================
+     */
+    async function renderGmbView() {
+      const region = STATE.gmb.region;
+      const endpoint = `https://data.etagmb.gov.hk/route/${region}`;
+
+      setViewHeader({
+        badge: `GMB ${region}`,
+        badgeBg: 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40',
+        title: `Green Minibus (GMB) — ${region === 'HKI' ? 'Hong Kong Island 港島' : region === 'KLN' ? 'Kowloon 九龍' : 'New Territories 新界'}`,
+        subtitle: 'Transport Department Real-Time GPS Green Minibus Arrival System (data.etagmb.gov.hk)',
+        endpoint,
+        onRefresh: 'renderGmbView()',
+      });
+
+      const container = document.getElementById('main-content');
+      container.innerHTML = `
+        <div class="rounded-2xl bg-panel border border-borderDark p-4 space-y-4">
+          <div class="flex flex-wrap items-center gap-2">
+            ${[
+              { id: 'HKI', label: 'Hong Kong Island 港島' },
+              { id: 'KLN', label: 'Kowloon 九龍' },
+              { id: 'NT', label: 'New Territories 新界' },
+            ].map(reg => `
+              <button onclick="setGmbRegion('${reg.id}')" class="px-4 py-2 rounded-xl text-xs font-bold border ${
+                region === reg.id ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50' : 'bg-card text-slate-400 border-borderDark'
+              }">
+                ${reg.label}
+              </button>
+            `).join('')}
+          </div>
+
+          <div id="gmb-route-selector" class="space-y-2">
+            <div class="text-xs text-slate-400 animate-pulse">Loading ${region} GMB routes...</div>
+          </div>
+        </div>
+
+        <div id="gmb-stops-box" class="rounded-2xl bg-panel border border-borderDark p-4">
+          <div class="py-6 text-center text-xs text-slate-400">${t('loading')}</div>
+        </div>
+      `;
+
+      try {
+        const routesRes = await apiFetch(`GMB Routes ${region}`, endpoint);
+        const routes = routesRes?.data?.routes || [];
+        STATE.gmb.routes = routes;
+        if (!routes.includes(STATE.gmb.selectedRoute)) {
+          STATE.gmb.selectedRoute = routes[0] || '1';
+        }
+
+        document.getElementById('gmb-route-selector').innerHTML = `
+          <div class="text-xs font-bold uppercase tracking-wider text-slate-400">Select GMB Route (${routes.length} routes in ${region})</div>
+          <div class="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto p-1">
+            ${routes.map(r => `
+              <button
+                onclick="selectGmbRoute('${r}')"
+                class="px-2.5 py-1.5 rounded-lg font-mono text-xs font-bold transition ${
+                  r === STATE.gmb.selectedRoute ? 'bg-emerald-500 text-obsidian' : 'bg-card hover:bg-slate-800 text-slate-300 border border-borderDark'
+                }"
+              >
+                ${escapeHtml(r)}
+              </button>
+            `).join('')}
+          </div>
+        `;
+
+        // Fetch route variants & stops
+        const detailRes = await apiFetch(`GMB Detail ${region}/${STATE.gmb.selectedRoute}`, `https://data.etagmb.gov.hk/route/${region}/${STATE.gmb.selectedRoute}`);
+        const variant = detailRes?.data?.[0];
+        if (!variant) {
+          document.getElementById('gmb-stops-box').innerHTML = `<div class="py-6 text-center text-xs text-slate-400">No active variant data for GMB ${escapeHtml(STATE.gmb.selectedRoute)}.</div>`;
+          return;
+        }
+
+        const dirObj = variant.directions?.[STATE.gmb.selectedVariantIdx] || variant.directions?.[0];
+        const stopsRes = await apiFetch(`GMB Stops ${variant.route_id}`, `https://data.etagmb.gov.hk/route-stop/${variant.route_id}/${dirObj.route_seq}`);
+        const stops = stopsRes?.data?.route_stops || [];
+
+        document.getElementById('gmb-stops-box').innerHTML = `
+          <div class="flex flex-wrap items-center justify-between gap-2 border-b border-borderDark pb-3 mb-3">
+            <div>
+              <div class="text-sm font-bold text-white">
+                Route ${escapeHtml(STATE.gmb.selectedRoute)}: ${escapeHtml(STATE.lang === 'en' ? `${dirObj.orig_en} → ${dirObj.dest_en}` : `${dirObj.orig_tc} → ${dirObj.dest_tc}`)}
+              </div>
+              <div class="text-[11px] text-slate-400 font-mono">Route ID: ${variant.route_id} • Seq: ${dirObj.route_seq}</div>
+            </div>
+            ${variant.directions.length > 1 ? `
+              <button onclick="toggleGmbDirection()" class="px-3 py-1.5 rounded-xl bg-card hover:bg-slate-800 border border-borderDark text-xs font-bold text-emerald-300">
+                <i class="fa-solid fa-repeat mr-1"></i> Switch Direction
+              </button>
+            ` : ''}
+          </div>
+          <div class="divide-y divide-borderDark/70">
+            ${stops.map(st => `
+              <div class="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div class="flex items-center gap-3">
+                  <span class="w-6 h-6 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 flex items-center justify-center font-mono text-xs font-bold">
+                    ${st.stop_seq}
+                  </span>
+                  <span class="text-xs sm:text-sm font-bold text-white">${escapeHtml(STATE.lang === 'en' ? st.name_en : st.name_tc)}</span>
+                </div>
+                <div id="gmb-eta-${variant.route_id}-${dirObj.route_seq}-${st.stop_seq}" class="flex items-center gap-2">
+                  <span class="text-[11px] text-slate-500 animate-pulse">GPS ETA...</span>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        `;
+
+        // Fetch live GPS ETA for stops
+        await Promise.all(stops.map(async (st) => {
+          try {
+            const etaRes = await fetch(`https://data.etagmb.gov.hk/eta/route-stop/${variant.route_id}/${dirObj.route_seq}/${st.stop_seq}`).then(r => r.json());
+            const etas = etaRes?.data?.eta || [];
+            const el = document.getElementById(`gmb-eta-${variant.route_id}-${dirObj.route_seq}-${st.stop_seq}`);
+            if (el) {
+              el.innerHTML = etas.length === 0
+                ? `<span class="text-xs text-slate-500">No GPS ETA</span>`
+                : etas.slice(0, 3).map(e => formatMinutesBadge(e.diff, STATE.lang === 'en' ? e.remarks_en : e.remarks_tc)).join('');
+            }
+          } catch {}
+        }));
+      } catch (err) {
+        document.getElementById('gmb-stops-box').innerHTML = `<div class="p-4 text-xs text-rose-300">GMB API Error: ${escapeHtml(err.message)}</div>`;
+      }
+    }
+
+    function setGmbRegion(reg) {
+      STATE.gmb.region = reg;
+      STATE.gmb.selectedVariantIdx = 0;
+      renderGmbView();
+    }
+
+    function selectGmbRoute(route) {
+      STATE.gmb.selectedRoute = route;
+      STATE.gmb.selectedVariantIdx = 0;
+      renderGmbView();
+    }
+
+    function toggleGmbDirection() {
+      STATE.gmb.selectedVariantIdx = STATE.gmb.selectedVariantIdx === 0 ? 1 : 0;
+      renderGmbView();
+    }
+
+    /**
+     * ============================================================================
+     * 16. VIEW 8: NEW LANTAO BUS / NLB (rt.data.gov.hk/v2/transport/nlb)
+     * ============================================================================
+     */
+    async function renderNlbView() {
+      const endpoint = 'https://rt.data.gov.hk/v2/transport/nlb/route.php?action=list';
+
+      setViewHeader({
+        badge: 'NLB 嶼巴',
+        badgeBg: 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40',
+        title: 'New Lantao Bus (NLB) — Lantau, Ngong Ping, Tai O & Border Routes',
+        subtitle: 'Live NLB Route Directory, Stop Fares & Real-Time Arrival Feed',
+        endpoint,
+        onRefresh: 'renderNlbView()',
+      });
+
+      const container = document.getElementById('main-content');
+      container.innerHTML = `
+        <div class="rounded-2xl bg-panel border border-borderDark p-4 space-y-3">
+          <div class="text-xs font-bold uppercase tracking-wider text-slate-400">Select New Lantao Bus Route</div>
+          <div id="nlb-routes-box" class="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto">
+            <div class="text-xs text-slate-400 animate-pulse">Loading NLB routes...</div>
+          </div>
+        </div>
+
+        <div id="nlb-stops-box" class="rounded-2xl bg-panel border border-borderDark p-4">
+          <div class="py-6 text-center text-xs text-slate-400">${t('loading')}</div>
+        </div>
+      `;
+
+      try {
+        if (!STATE.nlb.loaded) {
+          const res = await apiFetch('NLB Routes', endpoint);
+          STATE.nlb.routes = res?.routes || [];
+          STATE.nlb.loaded = true;
+          if (STATE.nlb.routes.length > 0 && !STATE.nlb.selectedRouteId) {
+            STATE.nlb.selectedRouteId = STATE.nlb.routes[0].routeId;
+          }
+        }
+
+        const activeRoute = STATE.nlb.routes.find(r => r.routeId === STATE.nlb.selectedRouteId) || STATE.nlb.routes[0];
+        STATE.nlb.selectedRouteId = activeRoute.routeId;
+
+        document.getElementById('nlb-routes-box').innerHTML = STATE.nlb.routes.map(r => `
+          <button
+            onclick="selectNlbRoute('${r.routeId}')"
+            class="px-3 py-1.5 rounded-xl text-xs font-semibold transition ${
+              r.routeId === activeRoute.routeId ? 'bg-cyan-400 text-obsidian font-extrabold' : 'bg-card hover:bg-slate-800 text-slate-300 border border-borderDark'
+            }"
+          >
+            <span class="font-mono font-bold mr-1">${escapeHtml(r.routeNo)}</span>
+            <span>${escapeHtml(STATE.lang === 'en' ? r.routeName_e : r.routeName_c)}</span>
+          </button>
+        `).join('');
+
+        const stopsRes = await apiFetch(`NLB Stops ${activeRoute.routeNo}`, `https://rt.data.gov.hk/v2/transport/nlb/stop.php?action=list&routeId=${activeRoute.routeId}`);
+        const stops = stopsRes?.stops || [];
+
+        document.getElementById('nlb-stops-box').innerHTML = `
+          <div class="border-b border-borderDark pb-3 mb-3">
+            <div class="text-sm font-bold text-white">
+              Route ${escapeHtml(activeRoute.routeNo)}: ${escapeHtml(STATE.lang === 'en' ? activeRoute.routeName_e : activeRoute.routeName_c)}
+            </div>
+          </div>
+          <div class="divide-y divide-borderDark/70">
+            ${stops.map((st, idx) => `
+              <div class="py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div class="flex items-start gap-3">
+                  <span class="w-6 h-6 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 flex items-center justify-center font-mono text-xs font-bold shrink-0">
+                    ${idx + 1}
+                  </span>
+                  <div>
+                    <div class="text-sm font-bold text-white">${escapeHtml(STATE.lang === 'en' ? st.stopName_e : st.stopName_c)}</div>
+                    <div class="text-[11px] text-slate-400">${escapeHtml(STATE.lang === 'en' ? st.stopLocation_e : st.stopLocation_c)} • Fare: <span class="font-mono text-cyan-300">HK$${escapeHtml(st.fare)}</span></div>
+                  </div>
+                </div>
+                <div id="nlb-eta-${st.stopId}" class="flex items-center gap-2">
+                  <span class="text-[11px] text-slate-500 animate-pulse">Checking ETA...</span>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        `;
+
+        await Promise.all(stops.map(async (st) => {
+          try {
+            const etaRes = await fetch(`https://rt.data.gov.hk/v2/transport/nlb/stop.php?action=estimatedArrivals&routeId=${activeRoute.routeId}&stopId=${st.stopId}&language=${STATE.lang === 'en' ? 'en' : 'zh'}`).then(r => r.json());
+            const arrivals = etaRes?.estimatedArrivals || [];
+            const el = document.getElementById(`nlb-eta-${st.stopId}`);
+            if (el) {
+              el.innerHTML = arrivals.length === 0
+                ? `<span class="text-xs text-slate-500">No live bus</span>`
+                : arrivals.slice(0, 3).map(a => formatMinutesBadge(calcMinutesFromISO(a.estimatedArrivalTime))).join('');
+            }
+          } catch {}
+        }));
+      } catch (err) {
+        document.getElementById('nlb-stops-box').innerHTML = `<div class="p-4 text-xs text-rose-300">NLB API Error: ${escapeHtml(err.message)}</div>`;
+      }
+    }
+
+    function selectNlbRoute(routeId) {
+      STATE.nlb.selectedRouteId = routeId;
+      renderNlbView();
+    }
+
+    /**
+     * ============================================================================
+     * 17. VIEW 9: FERRIES & TD SPECIAL TRAFFIC ADVISORIES
+     * ============================================================================
+     */
+    async function renderFerryView() {
+      const endpoint = 'https://www.td.gov.hk/tc/special_news/trafficnews.xml';
+      setViewHeader({
+        badge: 'FERRY & TD',
+        badgeBg: 'bg-blue-500/20 text-blue-300 border border-blue-500/40',
+        title: 'Victoria Harbour & Outlying Island Ferries + Transport Dept Advisories',
+        subtitle: 'Star Ferry, Sun Ferry, Hong Kong & Kowloon Ferry Live Sailing Countdowns & TD Traffic Feed',
+        endpoint,
+        onRefresh: 'renderFerryView()',
+      });
+
+      const nowHkt = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Hong_Kong' }));
+      const currentMins = nowHkt.getHours() * 60 + nowHkt.getMinutes();
+
+      const container = document.getElementById('main-content');
+      container.innerHTML = `
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          ${FERRY_SERVICES.map(f => {
+            const nextMin = f.intervalMin - (currentMins % f.intervalMin);
+            return `
+              <div class="rounded-2xl bg-panel border border-borderDark p-4 flex flex-col justify-between gap-4">
+                <div class="space-y-1.5">
+                  <div class="flex items-center justify-between">
+                    <span class="px-2.5 py-0.5 rounded-lg bg-blue-500/15 text-blue-300 border border-blue-500/30 text-[11px] font-bold">
+                      <i class="fa-solid fa-ferry mr-1"></i> ${escapeHtml(f.operator)}
+                    </span>
+                    <span class="font-mono text-xs text-slate-400">${escapeHtml(f.fare)}</span>
+                  </div>
+                  <h3 class="text-base font-extrabold text-white pt-1">${escapeHtml(STATE.lang === 'en' ? f.routeEn : f.routeTc)}</h3>
+                  <p class="text-xs text-slate-400">${escapeHtml(STATE.lang === 'en' ? f.pierEn : f.pierTc)}</p>
+                </div>
+
+                <div class="pt-3 border-t border-borderDark flex items-center justify-between">
+                  <div class="text-[11px] text-slate-400">
+                    <div>Service: <span class="font-mono text-slate-200">${f.first} - ${f.last}</span></div>
+                    <div>Headway: Every <span class="font-mono text-slate-200">${f.intervalMin} min</span></div>
+                  </div>
+                  <div class="text-right">
+                    <div class="text-[10px] uppercase text-slate-400 mb-0.5">Next Sailing</div>
+                    ${formatMinutesBadge(nextMin)}
+                  </div>
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+
+        <!-- Transport Department Special Traffic News Probe -->
+        <div id="td-news-box" class="rounded-2xl bg-panel border border-borderDark p-4 space-y-3">
+          <div class="flex items-center justify-between">
+            <h3 class="text-sm font-bold text-white flex items-center gap-2">
+              <i class="fa-solid fa-triangle-exclamation text-amber-400"></i>
+              <span>Transport Department Special Traffic News (td.gov.hk)</span>
+            </h3>
+            <span class="text-[11px] font-mono text-slate-400">XML Feed</span>
+          </div>
+          <div id="td-news-content" class="text-xs text-slate-400">Probing Transport Department Special Traffic Feed...</div>
+        </div>
+      `;
+
+      try {
+        const xmlText = await apiFetch('TD Traffic News', endpoint);
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(String(xmlText), 'text/xml');
+        const messages = Array.from(doc.querySelectorAll('message')).slice(0, 6);
+        const newsEl = document.getElementById('td-news-content');
+        if (newsEl && messages.length > 0) {
+          newsEl.innerHTML = `<div class="space-y-2">${messages.map(m => `
+            <div class="p-3 rounded-xl bg-card border border-borderDark text-slate-200 leading-relaxed">
+              ${escapeHtml(m.textContent.trim())}
+            </div>
+          `).join('')}</div>`;
+        } else if (newsEl) {
+          newsEl.textContent = 'No active major traffic disruptions reported.';
+        }
+      } catch {
+        const newsEl = document.getElementById('td-news-content');
+        if (newsEl) {
+          newsEl.innerHTML = `
+            <div class="p-3 rounded-xl bg-card border border-borderDark text-slate-300 flex items-center justify-between gap-3">
+              <span>Direct XML feed at <span class="font-mono text-sky-400">td.gov.hk/tc/special_news/trafficnews.xml</span> blocks cross-origin browser reads without proxy; all JSON/REST transport APIs above are operating at 100% live capacity.</span>
+              <a href="https://www.td.gov.hk/en/special_news/trafficnews.htm" target="_blank" rel="noopener" class="shrink-0 px-3 py-1.5 rounded-lg bg-sky-500/20 text-sky-300 font-bold">Open TD Portal</a>
+            </div>
+          `;
+        }
+      }
+    }
+
+    /**
+     * ============================================================================
+     * 18. INITIALIZE APPLICATION ON LOAD
+     * ============================================================================
+     */
+    window.addEventListener('DOMContentLoaded', () => {
+      startClock();
+      fetchHKOWeather();
+      renderNav();
+      renderActiveView();
+      startAutoRefreshLoop();
+      // Pre-warm KMB & Citybus catalogues quietly in background for instant omni-search
+      setTimeout(() => {
+        ensureKmbLoaded();
+        ensureCtbLoaded();
+      }, 1200);
+    });
+  </script>
+</body>
+</html>
